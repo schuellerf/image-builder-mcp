@@ -5,8 +5,9 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import requests
-from fastmcp import FastMCP, Request, Response
-from fastmcp.sse import SSEResponse
+from fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import Response
 
 class ImageBuilderClient:
     def __init__(self, client_id: str, client_secret: str):
