@@ -5,8 +5,6 @@ import time
 import requests
 import threading
 
-from langflow.interface.custom_components.base import CustomComponent
-
 app = FastAPI()
 
 # In-memory cache for the access token and compose state
@@ -54,6 +52,42 @@ def auth_headers(client_id: str, client_secret: str):
     token = token_cache.get_token(client_id, client_secret)
     return {"Authorization": f"Bearer {token}"}
 
+
+@app.post("/watch")
+async def sse_watch(creds: Credentials):
+    headers = auth_headers(creds.client_id, creds.client_secret)
+    compose_id = creds.compose_id or compose_cache.get(creds.client_id)
+
+    if not compose_id:
+        raise HTTPException(status_code=404, detail="No compose ID provided or cached")
+
+    compose_cache[creds.client_id] = compose_id
+
+    async def event_generator():
+        last_status = None
+        while True:
+            try:
+                resp = requests.get(f"{BASE_URL}/composes/{compose_id}", headers=headers)
+                if not resp.ok:
+                    yield f"event: error\ndata: Failed to fetch compose: {resp.text}\n\n"
+                    await asyncio.sleep(10)
+                    continue
+
+                data = resp.json()
+                status = data.get("image_status", {}).get("status")
+                if status != last_status:
+                    yield f"data: {data}\n\n"
+                    last_status = status
+
+                if status in {"success", "failure"}:
+                    break
+
+                await asyncio.sleep(5)
+            except Exception as e:
+                yield f"event: error\ndata: Exception occurred: {str(e)}\n\n"
+                await asyncio.sleep(10)
+
+    return EventSourceResponse(event_generator())
 
 @app.post("/blueprints")
 def get_blueprints(creds: Credentials):
@@ -130,35 +164,4 @@ def get_compose_by_id(compose_id: str, creds: Credentials):
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     return resp.json()
 
-
-# Langflow integration
-
-class ImageBuilderComponent(CustomComponent):
-    display_name = "Image Builder"
-    description = (
-        "Use this component to interact with Red Hat's Image Builder API. "
-        "It retrieves compose status or lists all composes depending on whether a Compose ID is provided. "
-        "The component authenticates using client credentials."
-    )
-
-    def build_config(self):
-        return {
-            "client_id": {"multiline": False, "description": "OAuth client ID from Red Hat SSO."},
-            "client_secret": {"multiline": False, "description": "OAuth client secret."},
-            "compose_id": {
-                "multiline": False,
-                "required": False,
-                "description": "Optional UUID of a specific compose to fetch. If omitted, returns the latest list of composes."
-            },
-        }
-
-    def run(self, client_id: str, client_secret: str, compose_id: Optional[str] = None) -> dict:
-        headers = auth_headers(client_id, client_secret)
-        if compose_id:
-            url = f"{BASE_URL}/composes/{compose_id}"
-        else:
-            url = f"{BASE_URL}/composes"
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json()
 
