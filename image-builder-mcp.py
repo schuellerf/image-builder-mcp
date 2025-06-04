@@ -142,11 +142,11 @@ def get_blueprint_details(blueprint_uuid: str) -> str:
         return f"Error: {str(e)}"
 
 @mcp.tool()
-def get_composes(dummy: str|None = "") -> str:
+def get_composes(username: str|None) -> str:
     """Get all composes.
 
     Args:
-        dummy: Avoid typing problems with Langflow
+        username: dummy parameter to avoid typing problems with Langflow
 
     Returns:
         List of composes
@@ -189,6 +189,13 @@ def get_compose(compose_uuid: str = None) -> str:
     if not compose_uuid:
         return "Error: Compose UUID is required"
     try:
+        global composes
+        if not composes:
+            get_composes("")
+        for c in composes:
+            if c["image_name"].lower() == compose_uuid.lower():
+                compose_uuid = c["compose_uuid"]
+                break
         return json.dumps(client.make_request(f"composes/{compose_uuid}"), indent=2)
     except Exception as e:
         return f"Error: {str(e)}"
