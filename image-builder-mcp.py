@@ -67,6 +67,7 @@ if not client_secret:
 client = ImageBuilderClient(client_id, client_secret)
 
 blueprints = None
+composes = None
 
 @mcp.tool()
 def get_blueprints(dummy: str|None = "") -> str:
@@ -115,25 +116,76 @@ def get_blueprint_uuid(dummy: str|None, reply_id: int) -> str:
 
 @mcp.tool()
 def get_blueprint_details(blueprint_uuid: str) -> str:
-    """Get details of a specific blueprint by UUID. Always provide a blueprint_uuid here. Not the name of the blueprint."""
+    """Get details of a specific blueprint by UUID. Always provide a blueprint_uuid here. Not the name of the blueprint.
+    
+    Args:
+        blueprint_uuid: the UUID to query
+
+    Returns:
+        Blueprint details
+
+    Raises:
+        Exception: If the image-builder connection fails.
+    """
     if not blueprint_uuid:
         return "Error: Blueprint UUID is required"
     try:
+        global blueprints
+        if not blueprints:
+            get_blueprints("")
+        for b in blueprints:
+            if b["name"] == blueprint_uuid:
+                blueprint_uuid = b["blueprint_uuid"]
+                break
         return json.dumps(client.make_request(f"blueprints/{blueprint_uuid}"), indent=2)
     except Exception as e:
         return f"Error: {str(e)}"
 
 @mcp.tool()
 def get_composes(dummy: str|None = "") -> str:
-    """Get all composes."""
+    """Get all composes.
+
+    Args:
+        dummy: Avoid typing problems with Langflow
+
+    Returns:
+        List of composes
+
+    Raises:
+        Exception: If the image-builder connection fails.
+    """
+    global composes
     try:
-        return json.dumps(client.make_request("composes"), indent=2)
+        response = client.make_request("composes")
+
+        ret = []
+        x = 1
+        for compose in response["data"]:
+            ret.append({"reply_id": x,
+                        "compose_uuid": compose["id"],
+                        "image_name": compose["image_name"]})
+            x += 1
+            # TBD: think about paging?
+            if x > 10:
+                break
+        composes = ret
+        return json.dumps(ret)
     except Exception as e:
         return f"Error: {str(e)}"
 
 @mcp.tool()
-def get_compose(compose_uuid: str) -> str:
-    """Get a specific compose by UUID."""
+def get_compose(compose_uuid: str = None) -> str:
+    """Get a specific compose by UUID.
+    
+    Args:
+        compose_uuid: the UUID to query
+
+    Returns:
+        Compose details
+
+    Raises:
+        Exception: If the image-builder connection fails.
+    """
     if not compose_uuid:
         return "Error: Compose UUID is required"
     try:
