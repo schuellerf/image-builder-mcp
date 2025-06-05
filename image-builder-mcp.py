@@ -206,9 +206,9 @@ class ImageBuilderMCP(FastMCP):
             # Prepare response message
             intro = ""
             if len(matching_blueprints) == 0:
-                intro = f"No blueprint found for '{blueprint_uuid}'.\n"
+                intro = f"No blueprint found for '{blueprint_identifier}'.\n"
             elif len(matching_blueprints) > 1:
-                intro = f"Found {len(ret)} blueprints for '{blueprint_uuid}'.\n"
+                intro = f"Found {len(ret)} blueprints for '{blueprint_identifier}'.\n"
 
             return f"{intro}{json.dumps(ret)}"
         except Exception as e:
