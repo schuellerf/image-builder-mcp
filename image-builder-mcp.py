@@ -169,13 +169,13 @@ class ImageBuilderMCP(FastMCP):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def get_blueprint_details(self, blueprint_uuid: str) -> str:
+    def get_blueprint_details(self, blueprint_uuid: str|None = None) -> str:
         f"""
         {GENERAL_INTRO}
-        Get details of a specific blueprint by UUID. Always provide a blueprint_uuid here. Not the name of the blueprint.
-        
+        Get blueprint details.
+
         Args:
-            blueprint_uuid: the UUID to query
+            blueprint_uuid: the UUID, name or reply_id to query
 
         Returns:
             Blueprint details
@@ -188,24 +188,27 @@ class ImageBuilderMCP(FastMCP):
         try:
             if not self.blueprints:
                 self.get_blueprints("")
-            uuids = []
-            for b in self.blueprints:
-                if b["name"] == blueprint_uuid:
-                    uuids.append(b["blueprint_uuid"])
-                elif b["blueprint_uuid"] == blueprint_uuid:
-                    uuids.append(b["blueprint_uuid"])
-                elif b["reply_id"] == blueprint_uuid:
-                    uuids.append(b["blueprint_uuid"])
+
+            # Find matching blueprints using filter
+            matching_blueprints = list(filter(
+                lambda b: (b["name"] == blueprint_uuid or
+                          b["blueprint_uuid"] == blueprint_uuid or
+                          str(b["reply_id"]) == blueprint_uuid),
+                self.blueprints
+            ))
+
+            # Get details for each matching blueprint
             ret = []
-            for uuid in uuids:
-                response = self.client.make_request(f"blueprints/{blueprint_uuid}")
+            for blueprint in matching_blueprints:
+                response = self.client.make_request(f"blueprints/{blueprint['blueprint_uuid']}")
                 # TBD filter irrelevant attributes
                 ret.append(response)
 
+            # Prepare response message
             intro = ""
-            if len(uuids) == 0:
+            if len(matching_blueprints) == 0:
                 intro = f"No blueprint found for '{blueprint_uuid}'.\n"
-            elif len(uuids) > 1:
+            elif len(matching_blueprints) > 1:
                 intro = f"Found {len(ret)} blueprints for '{blueprint_uuid}'.\n"
 
             return f"{intro}{json.dumps(ret)}"
@@ -244,7 +247,7 @@ class ImageBuilderMCP(FastMCP):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def get_compose(self, compose_uuid: str = None) -> str:
+    def get_compose(self, compose_uuid: str|None = None) -> str:
         f"""
         {GENERAL_INTRO}
         Get a specific compose by UUID.
