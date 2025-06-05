@@ -6,9 +6,6 @@ from pydantic import Field
 import requests
 from fastmcp import FastMCP, Context
 
-# this text describes the context used for all tool-fuctions here
-GENERAL_INTRO = "function for Redhat console.redhat.com image-builder. aka osbuild.org"
-
 class ImageBuilderClient:
     def __init__(self, client_id: str, client_secret: str):
         self.client_id = client_id
@@ -16,36 +13,37 @@ class ImageBuilderClient:
         self.token = None
         self.token_expiry = None
         self.base_url = "https://console.redhat.com/api/image-builder/v1"
-        
+
+
     def get_token(self) -> str:
         """Get or refresh the authentication token."""
         if self.token and self.token_expiry and datetime.now() < self.token_expiry:
             return self.token
-            
+
         token_url = "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
         data = {
             "grant_type": "client_credentials",
             "client_id": self.client_id,
             "client_secret": self.client_secret
         }
-        
+
         response = requests.post(token_url, data=data)
         response.raise_for_status()
-        
+
         token_data = response.json()
         self.token = token_data["access_token"]
         # Set token expiry to 5 minutes before actual expiry to ensure we refresh in time
         self.token_expiry = datetime.now() + timedelta(seconds=token_data["expires_in"] - 300)
-        
+
         return self.token
-    
+
     def make_request(self, endpoint: str, method: str = "GET", data: Optional[Dict] = None) -> Dict[str, Any]:
         """Make an authenticated request to the Image Builder API."""
         headers = {
             "Authorization": f"Bearer {self.get_token()}",
             "Content-Type": "application/json"
         }
-        
+
         url = f"{self.base_url}/{endpoint}"
         response = requests.request(method, url, headers=headers, json=data)
         response.raise_for_status()
@@ -62,9 +60,10 @@ class ImageBuilderMCP(FastMCP):
         self.blueprints = None
         self.composes = None
         self.blueprint_current_index = 0
+        self.compose_current_index = 0
 
         self.default_response_size = default_response_size
-        
+
         # Register all tools
         self.tool()(self.get_blueprints)
         self.tool()(self.get_more_blueprints)
@@ -73,8 +72,7 @@ class ImageBuilderMCP(FastMCP):
         self.tool()(self.get_compose)
 
     def get_blueprints(self, response_size: int|None = None, search_string: str|None = None) -> str:
-        f"""
-        {GENERAL_INTRO}
+        """function for Redhat console.redhat.com image-builder. aka osbuild.org
         Get all blueprints without details.
         For "all" set "response_size" to None
         This starts a fresh search.
@@ -85,9 +83,6 @@ class ImageBuilderMCP(FastMCP):
 
         Returns:
             List of blueprints
-
-        Raises:
-            Exception: If the image-builder connection fails.
         """
         response_size = response_size or self.default_response_size
         if response_size <= 0:
@@ -103,7 +98,7 @@ class ImageBuilderMCP(FastMCP):
                         "name": blueprint["name"]}
 
                 self.blueprints.append(data)
-                
+
                 if len(ret) <= response_size:
                     if search_string:
                         if search_string.lower() in data["name"].lower():
@@ -122,9 +117,9 @@ class ImageBuilderMCP(FastMCP):
         except Exception as e:
             return f"Error: {str(e)}"
 
+
     def get_more_blueprints(self, response_size: int|None = None, search_string: str|None = None) -> str:
-        f"""
-        {GENERAL_INTRO}
+        """function for Redhat console.redhat.com image-builder. aka osbuild.org
         Get more blueprints without details. To be called after get_blueprints if the user wants more.
 
         Args:
@@ -170,8 +165,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
     def get_blueprint_details(self, blueprint_uuid: str|None = None) -> str:
-        f"""
-        {GENERAL_INTRO}
+        """function for Redhat console.redhat.com image-builder. aka osbuild.org
         Get blueprint details.
 
         Args:
@@ -215,13 +209,16 @@ class ImageBuilderMCP(FastMCP):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def get_composes(self, username: str|None) -> str:
-        f"""
-        {GENERAL_INTRO}
-        Get all composes.
+
+    def get_composes(self, response_size: int|None = None, search_string: str|None = None) -> str:
+        """function for Redhat console.redhat.com image-builder. aka osbuild.org
+        Get all composes without details.
+        For "all" set "response_size" to None
+        This starts a fresh search.
 
         Args:
-            username: dummy parameter to avoid typing problems with Langflow
+            response_size: number of items returned (optional)
+            search_string: substring to search for in the name (optional)
 
         Returns:
             List of composes
@@ -229,31 +226,98 @@ class ImageBuilderMCP(FastMCP):
         Raises:
             Exception: If the image-builder connection fails.
         """
+        response_size = response_size or self.default_response_size
+        if response_size <= 0:
+            response_size = self.default_response_size
         try:
             response = self.client.make_request("composes")
 
-            ret = []
-            x = 1
-            for compose in response["data"]:
-                ret.append({"reply_id": x,
-                            "compose_uuid": compose["id"],
-                            "image_name": compose["image_name"]})
-                x += 1
-                # TBD: think about paging?
-                if x > 10:
-                    break
-            self.composes = ret
-            return json.dumps(ret)
+            # Create compose data with reply_id
+            self.composes = [
+                {"reply_id": i + 1,
+                 "compose_uuid": compose["id"],
+                 "image_name": compose["image_name"]}
+                for i, compose in enumerate(response["data"])
+            ]
+
+            # Filter composes if search_string is provided
+            filtered_composes = self.composes
+            if search_string:
+                search_lower = search_string.lower()
+                filtered_composes = list(filter(
+                    lambda c: search_lower in c["image_name"].lower(),
+                    self.composes
+                ))
+
+            # Take only the requested number of items
+            ret = filtered_composes[:response_size]
+            self.compose_current_index = len(ret)
+
+            # Prepare response message
+            intro = ""
+            if len(filtered_composes) > len(ret):
+                intro = f"Only {len(ret)} out of {len(filtered_composes)} returned. Ask for more if needed:"
+            else:
+                intro = f"All {len(ret)} entries. There are no more."
+
+            return f"{intro}\n{json.dumps(ret)}"
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def get_more_composes(self, response_size: int|None = None, search_string: str|None = None) -> str:
+        """function for Redhat console.redhat.com image-builder. aka osbuild.org
+        Get more composes without details. To be called after get_composes if the user wants more.
+
+        Args:
+            response_size: number of items returned (optional)
+            search_string: substring to search for in the name (optional)
+
+        Returns:
+            List of composes
+
+        Raises:
+            Exception: If the image-builder connection fails.
+        """
+        response_size = response_size or self.default_response_size
+        if response_size <= 0:
+            response_size = self.default_response_size
+        try:
+            if not self.composes:
+                self.get_composes()
+
+            if self.compose_current_index >= len(self.composes):
+                return "There are no more composes. Should I start a fresh search?"
+
+            # Filter composes if search_string is provided
+            filtered_composes = self.composes
+            if search_string:
+                search_lower = search_string.lower()
+                filtered_composes = list(filter(
+                    lambda c: search_lower in c["image_name"].lower(),
+                    self.composes
+                ))
+
+            # Get the next batch of items
+            ret = filtered_composes[self.compose_current_index:self.compose_current_index + response_size]
+            self.compose_current_index = min(self.compose_current_index + len(ret), len(self.composes))
+
+            # Prepare response message
+            intro = ""
+            if len(filtered_composes) > self.compose_current_index:
+                intro = f"Only {len(ret)} out of {len(filtered_composes)} returned. Ask for more if needed:"
+            else:
+                intro = f"All {len(ret)} entries. There are no more."
+
+            return f"{intro}\n{json.dumps(ret)}"
         except Exception as e:
             return f"Error: {str(e)}"
 
     def get_compose(self, compose_uuid: str|None = None) -> str:
-        f"""
-        {GENERAL_INTRO}
-        Get a specific compose by UUID.
-        
+        """function for Redhat console.redhat.com image-builder. aka osbuild.org
+        Get compose details.
+
         Args:
-            compose_uuid: the UUID to query
+            compose_uuid: the UUID, name or reply_id to query
 
         Returns:
             Compose details
@@ -265,12 +329,31 @@ class ImageBuilderMCP(FastMCP):
             return "Error: Compose UUID is required"
         try:
             if not self.composes:
-                self.get_composes("")
-            for c in self.composes:
-                if c["image_name"].lower() == compose_uuid.lower():
-                    compose_uuid = c["compose_uuid"]
-                    break
-            return json.dumps(self.client.make_request(f"composes/{compose_uuid}"), indent=2)
+                self.get_composes()
+
+            # Find matching composes using filter
+            matching_composes = list(filter(
+                lambda c: (c["image_name"] == compose_uuid or 
+                          c["compose_uuid"] == compose_uuid or 
+                          str(c["reply_id"]) == compose_uuid),
+                self.composes
+            ))
+
+            # Get details for each matching compose
+            ret = []
+            for compose in matching_composes:
+                response = self.client.make_request(f"composes/{compose['compose_uuid']}")
+                # TBD filter irrelevant attributes
+                ret.append(response)
+
+            # Prepare response message
+            intro = ""
+            if len(matching_composes) == 0:
+                intro = f"No compose found for '{compose_uuid}'.\n"
+            elif len(matching_composes) > 1:
+                intro = f"Found {len(ret)} composes for '{compose_uuid}'.\n"
+
+            return f"{intro}{json.dumps(ret)}"
         except Exception as e:
             return f"Error: {str(e)}"
 
