@@ -72,7 +72,7 @@ class ImageBuilderMCP(FastMCP):
         self.tool()(self.get_composes)
         self.tool()(self.get_compose)
 
-    def get_blueprints(self, response_size: int|None = None) -> str:
+    def get_blueprints(self, response_size: int|None = None, search_string: str|None = None) -> str:
         f"""
         {GENERAL_INTRO}
         Get all blueprints without details.
@@ -81,6 +81,7 @@ class ImageBuilderMCP(FastMCP):
 
         Args:
             response_size: number of items returned (optional)
+            search_string: substring to search for in the name (optional)
 
         Returns:
             List of blueprints
@@ -103,8 +104,12 @@ class ImageBuilderMCP(FastMCP):
 
                 self.blueprints.append(data)
                 
-                if i <= response_size:
-                    ret.append(data)
+                if len(ret) <= response_size:
+                    if search_string:
+                        if search_string.lower() in data["name"].lower():
+                            ret.append(data)
+                    else:
+                        ret.append(data)
 
                 i += 1
             self.blueprint_current_index = min(i, response_size)
@@ -117,13 +122,14 @@ class ImageBuilderMCP(FastMCP):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def get_more_blueprints(self, response_size: int|None = None) -> str:
+    def get_more_blueprints(self, response_size: int|None = None, search_string: str|None = None) -> str:
         f"""
         {GENERAL_INTRO}
         Get more blueprints without details. To be called after get_blueprints if the user wants more.
 
         Args:
             response_size: number of items returned (optional)
+            search_string: substring to search for in the name (optional)
 
         Returns:
             List of blueprints
@@ -132,6 +138,8 @@ class ImageBuilderMCP(FastMCP):
             Exception: If the image-builder connection fails.
         """
         response_size = response_size or self.default_response_size
+        if response_size <= 0:
+            response_size = self.default_response_size
         try:
             if not self.blueprints:
                 self.get_blueprints()
@@ -143,8 +151,12 @@ class ImageBuilderMCP(FastMCP):
             ret = []
             for blueprint in self.blueprints:
                 i += 1
-                if i > self.blueprint_current_index and i <= (self.blueprint_current_index + response_size):
-                    ret.append(blueprint)
+                if i > self.blueprint_current_index and len(ret) < response_size:
+                    if search_string:
+                        if search_string.lower() in blueprint["name"].lower():
+                            ret.append(blueprint)
+                    else:
+                        ret.append(blueprint)
 
             self.blueprint_current_index = min(self.blueprint_current_index + len(ret), len(self.blueprints))
 
