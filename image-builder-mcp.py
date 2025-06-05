@@ -71,7 +71,8 @@ class ImageBuilderMCP(FastMCP):
                           self.get_more_blueprints,
                           self.get_blueprint_details,
                           self.get_composes,
-                          self.get_compose]
+                          self.get_more_composes,
+                          self.get_compose_details]
         for f in tool_functions:
             self.tool(description=f.__doc__.format(GENERAL_INTRO=GENERAL_INTRO))(f)
 
@@ -168,12 +169,12 @@ class ImageBuilderMCP(FastMCP):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def get_blueprint_details(self, blueprint_uuid: str|None = None) -> str:
+    def get_blueprint_details(self, blueprint_identifier: str|None = None) -> str:
         """{GENERAL_INTRO}
         Get blueprint details.
 
         Args:
-            blueprint_uuid: the UUID, name or reply_id to query
+            blueprint_identifier: the UUID, name or reply_id to query
 
         Returns:
             Blueprint details
@@ -181,17 +182,17 @@ class ImageBuilderMCP(FastMCP):
         Raises:
             Exception: If the image-builder connection fails.
         """
-        if not blueprint_uuid:
-            return "Error: Blueprint UUID is required"
+        if not blueprint_identifier:
+            return "Error: a blueprint identifier is required"
         try:
             if not self.blueprints:
                 self.get_blueprints("")
 
             # Find matching blueprints using filter
             matching_blueprints = list(filter(
-                lambda b: (b["name"] == blueprint_uuid or
-                          b["blueprint_uuid"] == blueprint_uuid or
-                          str(b["reply_id"]) == blueprint_uuid),
+                lambda b: (b["name"] == blueprint_identifier or
+                          b["blueprint_uuid"] == blueprint_identifier or
+                          str(b["reply_id"]) == blueprint_identifier),
                 self.blueprints
             ))
 
@@ -316,12 +317,12 @@ class ImageBuilderMCP(FastMCP):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def get_compose(self, compose_uuid: str|None = None) -> str:
+    def get_compose_details(self, compose_identifier: str|None = None) -> str:
         """{GENERAL_INTRO}
         Get compose details.
 
         Args:
-            compose_uuid: the UUID, name or reply_id to query
+            compose_identifier: the UUID, name or reply_id to query
 
         Returns:
             Compose details
@@ -329,7 +330,7 @@ class ImageBuilderMCP(FastMCP):
         Raises:
             Exception: If the image-builder connection fails.
         """
-        if not compose_uuid:
+        if not compose_identifier:
             return "Error: Compose UUID is required"
         try:
             if not self.composes:
@@ -337,9 +338,9 @@ class ImageBuilderMCP(FastMCP):
 
             # Find matching composes using filter
             matching_composes = list(filter(
-                lambda c: (c["image_name"] == compose_uuid or 
-                          c["compose_uuid"] == compose_uuid or 
-                          str(c["reply_id"]) == compose_uuid),
+                lambda c: (c["image_name"] == compose_identifier or
+                          c["compose_uuid"] == compose_identifier or
+                          str(c["reply_id"]) == compose_identifier),
                 self.composes
             ))
 
@@ -353,9 +354,9 @@ class ImageBuilderMCP(FastMCP):
             # Prepare response message
             intro = ""
             if len(matching_composes) == 0:
-                intro = f"No compose found for '{compose_uuid}'.\n"
+                intro = f"No compose found for '{compose_identifier}'.\n"
             elif len(matching_composes) > 1:
-                intro = f"Found {len(ret)} composes for '{compose_uuid}'.\n"
+                intro = f"Found {len(ret)} composes for '{compose_identifier}'.\n"
 
             return f"{intro}{json.dumps(ret)}"
         except Exception as e:
