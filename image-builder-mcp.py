@@ -53,6 +53,8 @@ class ImageBuilderClient:
 # Store active composes for easy reference
 active_composes: Dict[str, str] = {}
 
+GENERAL_INTRO = "Function for Redhat console.redhat.com image-builder osbuild.org"
+
 class ImageBuilderMCP(FastMCP):
     def __init__(self, client_id: str, client_secret: str, default_response_size: int = 10):
         super().__init__("Image Builder MCP Server")
@@ -63,16 +65,18 @@ class ImageBuilderMCP(FastMCP):
         self.compose_current_index = 0
 
         self.default_response_size = default_response_size
-
-        # Register all tools
-        self.tool()(self.get_blueprints)
-        self.tool()(self.get_more_blueprints)
-        self.tool()(self.get_blueprint_details)
-        self.tool()(self.get_composes)
-        self.tool()(self.get_compose)
+        # prepend generic keywords for use of many other tools
+        # and register with "self.tool()"
+        tool_functions = [self.get_blueprints,
+                          self.get_more_blueprints,
+                          self.get_blueprint_details,
+                          self.get_composes,
+                          self.get_compose]
+        for f in tool_functions:
+            self.tool(description=f.__doc__.format(GENERAL_INTRO=GENERAL_INTRO))(f)
 
     def get_blueprints(self, response_size: int|None = None, search_string: str|None = None) -> str:
-        """function for Redhat console.redhat.com image-builder. aka osbuild.org
+        """{GENERAL_INTRO}
         Get all blueprints without details.
         For "all" set "response_size" to None
         This starts a fresh search.
@@ -119,7 +123,7 @@ class ImageBuilderMCP(FastMCP):
 
 
     def get_more_blueprints(self, response_size: int|None = None, search_string: str|None = None) -> str:
-        """function for Redhat console.redhat.com image-builder. aka osbuild.org
+        """{GENERAL_INTRO}
         Get more blueprints without details. To be called after get_blueprints if the user wants more.
 
         Args:
@@ -165,7 +169,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
     def get_blueprint_details(self, blueprint_uuid: str|None = None) -> str:
-        """function for Redhat console.redhat.com image-builder. aka osbuild.org
+        """{GENERAL_INTRO}
         Get blueprint details.
 
         Args:
@@ -211,7 +215,7 @@ class ImageBuilderMCP(FastMCP):
 
 
     def get_composes(self, response_size: int|None = None, search_string: str|None = None) -> str:
-        """function for Redhat console.redhat.com image-builder. aka osbuild.org
+        """{GENERAL_INTRO}
         Get all composes without details.
         For "all" set "response_size" to None
         This starts a fresh search.
@@ -265,7 +269,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
     def get_more_composes(self, response_size: int|None = None, search_string: str|None = None) -> str:
-        """function for Redhat console.redhat.com image-builder. aka osbuild.org
+        """{GENERAL_INTRO}
         Get more composes without details. To be called after get_composes if the user wants more.
 
         Args:
@@ -313,7 +317,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
     def get_compose(self, compose_uuid: str|None = None) -> str:
-        """function for Redhat console.redhat.com image-builder. aka osbuild.org
+        """{GENERAL_INTRO}
         Get compose details.
 
         Args:
