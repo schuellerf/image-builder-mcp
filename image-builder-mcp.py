@@ -53,7 +53,7 @@ class ImageBuilderClient:
 # Store active composes for easy reference
 active_composes: Dict[str, str] = {}
 
-GENERAL_INTRO = "Function for Redhat console.redhat.com image-builder osbuild.org"
+GENERAL_INTRO = "Function for Redhat console.redhat.com image-builder osbuild.org. Interacting with the production API."
 
 class ImageBuilderMCP(FastMCP):
     def __init__(self, client_id: str, client_secret: str, default_response_size: int = 10):
@@ -104,7 +104,7 @@ class ImageBuilderMCP(FastMCP):
 
                 self.blueprints.append(data)
 
-                if len(ret) <= response_size:
+                if len(ret) < response_size:
                     if search_string:
                         if search_string.lower() in data["name"].lower():
                             ret.append(data)
