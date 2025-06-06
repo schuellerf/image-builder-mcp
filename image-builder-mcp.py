@@ -75,7 +75,9 @@ class ImageBuilderMCP(FastMCP):
         self.default_response_size = default_response_size
         # prepend generic keywords for use of many other tools
         # and register with "self.tool()"
-        tool_functions = [self.get_blueprints,
+        tool_functions = [self.get_openapi,
+                          self.create_blueprint,
+                          self.get_blueprints,
                           self.get_more_blueprints,
                           self.get_blueprint_details,
                           self.get_composes,
@@ -89,6 +91,37 @@ class ImageBuilderMCP(FastMCP):
                     "openWorldHint": True
                 }
                 )(f)
+
+    def get_openapi(self, response_size: int) -> str:
+        """{GENERAL_INTRO}
+        Get OpenAPI spec. Use this to get details e.g for a new blueprint
+
+        Args:
+            response_size: number of items returned (use 7 as default)
+
+        Returns:
+            List of blueprints
+
+        Raises:
+            Exception: If the image-builder connection fails.
+        """
+        # response_size is just a dummy parameter for langflow
+        try:
+            response = self.client.make_request("openapi.json")
+            return json.dumps(response)
+        except Exception as e:
+            return f"Error: {str(e)}"
+
+    def create_blueprint(self, data: dict) -> str:
+        """{GENERAL_INTRO}
+        Create a new blueprint. Assure that the data is according to CreateBlueprintRequest descriped in openapi.
+        Ask user for more details to be able to fill "data" properly before calling this.
+        """
+        try:
+            # TBD: programmatically check against openapi
+            response = self.client.make_request("blueprints", method="POST", data=data)
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     def get_blueprints(self, response_size: int, search_string: str|None = None) -> str:
         """{GENERAL_INTRO}
