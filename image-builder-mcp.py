@@ -12,7 +12,15 @@ class ImageBuilderClient:
         self.client_secret = client_secret
         self.token = None
         self.token_expiry = None
-        self.base_url = "https://console.redhat.com/api/image-builder/v1"
+        self.stage = False
+        if self.stage:
+            # TBD fix stage authentication
+            self.domain = "console.stage.redhat.com"
+            self.sso_domain = "sso.stage.redhat.com"
+        else:
+            self.domain = "console.redhat.com"
+            self.sso_domain = "sso.redhat.com"
+        self.base_url = f"https://{self.domain}/api/image-builder/v1"
 
 
     def get_token(self) -> str:
@@ -20,7 +28,7 @@ class ImageBuilderClient:
         if self.token and self.token_expiry and datetime.now() < self.token_expiry:
             return self.token
 
-        token_url = "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+        token_url = f"https://{self.sso_domain}/auth/realms/redhat-external/protocol/openid-connect/token"
         data = {
             "grant_type": "client_credentials",
             "client_id": self.client_id,
@@ -115,7 +123,7 @@ class ImageBuilderMCP(FastMCP):
             for blueprint in sorted_data:
                 data = {"reply_id": i,
                         "blueprint_uuid": blueprint["id"],
-                        "UI_URL": f"https://console.redhat.com/insights/image-builder/imagewizard/{blueprint["id"]}",
+                        "UI_URL": f"https://{self.client.domain}/insights/image-builder/imagewizard/{blueprint["id"]}",
                         "name": blueprint["name"]}
 
                 self.blueprints.append(data)
