@@ -115,6 +115,7 @@ class ImageBuilderMCP(FastMCP):
             for blueprint in sorted_data:
                 data = {"reply_id": i,
                         "blueprint_uuid": blueprint["id"],
+                        "UI_URL": f"https://console.redhat.com/insights/image-builder/imagewizard/{blueprint["id"]}",
                         "name": blueprint["name"]}
 
                 self.blueprints.append(data)
@@ -128,11 +129,11 @@ class ImageBuilderMCP(FastMCP):
 
                 i += 1
             self.blueprint_current_index = min(i, response_size)
-            intro = ""
+            intro = "[INSTRUCTION] Use the UI_URL to link to the blueprint\n"
             if len(self.blueprints) > len(ret):
-                intro = f"Only {len(ret)} out of {len(self.blueprints)} returned. Ask for more if needed:"
+                intro += f"Only {len(ret)} out of {len(self.blueprints)} returned. Ask for more if needed:"
             else:
-                intro = f"All {len(ret)} entries. There are no more."
+                intro += f"All {len(ret)} entries. There are no more."
             return f"{intro}\n{json.dumps(ret)}"
         except Exception as e:
             return f"Error: {str(e)}"
