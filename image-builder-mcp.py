@@ -82,14 +82,14 @@ class ImageBuilderMCP(FastMCP):
                 }
                 )(f)
 
-    def get_blueprints(self, response_size: int|None = None, search_string: str|None = None) -> str:
+    def get_blueprints(self, response_size: int, search_string: str|None = None) -> str:
         """{GENERAL_INTRO}
         Get all blueprints without details.
         For "all" set "response_size" to None
         This starts a fresh search.
 
         Args:
-            response_size: number of items returned (optional)
+            response_size: number of items returned (use 7 as default)
             search_string: substring to search for in the name (optional)
 
         Returns:
@@ -138,12 +138,12 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
 
-    def get_more_blueprints(self, response_size: int|None = None, search_string: str|None = None) -> str:
+    def get_more_blueprints(self, response_size: int, search_string: str|None = None) -> str:
         """{GENERAL_INTRO}
         Get more blueprints without details. To be called after get_blueprints if the user wants more.
 
         Args:
-            response_size: number of items returned (optional)
+            response_size: number of items returned (use 7 as default)
             search_string: substring to search for in the name (optional)
 
         Returns:
@@ -184,7 +184,7 @@ class ImageBuilderMCP(FastMCP):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def get_blueprint_details(self, blueprint_identifier: str|None = None) -> str:
+    def get_blueprint_details(self, blueprint_identifier: str) -> str:
         """{GENERAL_INTRO}
         Get blueprint details.
 
@@ -230,14 +230,14 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
 
-    def get_composes(self, response_size: int|None = None, search_string: str|None = None) -> str:
+    def get_composes(self, response_size: int, search_string: str|None = None) -> str:
         """{GENERAL_INTRO}
         Get all composes without details.
         For "all" set "response_size" to None
         This starts a fresh search.
 
         Args:
-            response_size: number of items returned (optional)
+            response_size: number of items returned (use 7 as default)
             search_string: substring to search for in the name (optional)
 
         Returns:
@@ -285,12 +285,12 @@ class ImageBuilderMCP(FastMCP):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def get_more_composes(self, response_size: int|None = None, search_string: str|None = None) -> str:
+    def get_more_composes(self, response_size: int, search_string: str|None = None) -> str:
         """{GENERAL_INTRO}
         Get more composes without details. To be called after get_composes if the user wants more.
 
         Args:
-            response_size: number of items returned (optional)
+            response_size: number of items returned (use 7 as default)
             search_string: substring to search for in the name (optional)
 
         Returns:
@@ -333,7 +333,7 @@ class ImageBuilderMCP(FastMCP):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    def get_compose_details(self, compose_identifier: str|None = None) -> str:
+    def get_compose_details(self, compose_identifier: str) -> str:
         """{GENERAL_INTRO}
         Get compose details.
 
