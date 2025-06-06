@@ -74,7 +74,13 @@ class ImageBuilderMCP(FastMCP):
                           self.get_more_composes,
                           self.get_compose_details]
         for f in tool_functions:
-            self.tool(description=f.__doc__.format(GENERAL_INTRO=GENERAL_INTRO))(f)
+            self.tool(
+                description=f.__doc__.format(GENERAL_INTRO=GENERAL_INTRO),
+                annotations={
+                    "readOnlyHint": True,
+                    "openWorldHint": True
+                }
+                )(f)
 
     def get_blueprints(self, response_size: int|None = None, search_string: str|None = None) -> str:
         """{GENERAL_INTRO}
