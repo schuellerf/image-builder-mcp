@@ -94,16 +94,25 @@ class ImageBuilderMCP(FastMCP):
 
         Returns:
             List of blueprints
+
+        Raises:
+            Exception: If the image-builder connection fails.
         """
         response_size = response_size or self.default_response_size
         if response_size <= 0:
             response_size = self.default_response_size
         try:
             response = self.client.make_request("blueprints")
+
+            # Sort data by created_at
+            sorted_data = sorted(response["data"],
+                               key=lambda x: x.get("last_modified_at", ""),
+                               reverse=True)
+
             ret = []
             i = 1
             self.blueprints = []
-            for blueprint in response["data"]:
+            for blueprint in sorted_data:
                 data = {"reply_id": i,
                         "blueprint_uuid": blueprint["id"],
                         "name": blueprint["name"]}
@@ -243,34 +252,35 @@ class ImageBuilderMCP(FastMCP):
         try:
             response = self.client.make_request("composes")
 
-            # Create compose data with reply_id
-            self.composes = [
-                {"reply_id": i + 1,
-                 "compose_uuid": compose["id"],
-                 "image_name": compose["image_name"]}
-                for i, compose in enumerate(response["data"])
-            ]
+            # Sort data by created_at
+            sorted_data = sorted(response["data"],
+                               key=lambda x: x.get("created_at", ""),
+                               reverse=True)
 
-            # Filter composes if search_string is provided
-            filtered_composes = self.composes
-            if search_string:
-                search_lower = search_string.lower()
-                filtered_composes = list(filter(
-                    lambda c: search_lower in c["image_name"].lower(),
-                    self.composes
-                ))
+            ret = []
+            i = 1
+            self.composes = []
+            for compose in sorted_data:
+                data = {"reply_id": i,
+                        "compose_uuid": compose["id"],
+                        "image_name": compose["image_name"]}
 
-            # Take only the requested number of items
-            ret = filtered_composes[:response_size]
-            self.compose_current_index = len(ret)
+                self.composes.append(data)
 
-            # Prepare response message
+                if len(ret) < response_size:
+                    if search_string:
+                        if search_string.lower() in data["image_name"].lower():
+                            ret.append(data)
+                    else:
+                        ret.append(data)
+
+                i += 1
+            self.compose_current_index = min(i, response_size)
             intro = ""
-            if len(filtered_composes) > len(ret):
-                intro = f"Only {len(ret)} out of {len(filtered_composes)} returned. Ask for more if needed:"
+            if len(self.composes) > len(ret):
+                intro = f"Only {len(ret)} out of {len(self.composes)} returned. Ask for more if needed:"
             else:
                 intro = f"All {len(ret)} entries. There are no more."
-
             return f"{intro}\n{json.dumps(ret)}"
         except Exception as e:
             return f"Error: {str(e)}"
