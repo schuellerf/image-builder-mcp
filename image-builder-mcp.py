@@ -168,11 +168,9 @@ class ImageBuilderMCP(FastMCP):
         try:
             # TBD: programmatically check against openapi
             response = self.client.make_request("compose", method="POST", data=data)
-            # Store active compose for easy reference
-            active_composes[response["id"]] = response["image_name"]
             return f"Compose created successfully: {json.dumps(response)}"
         except Exception as e:
-            return f"Error: {str(e)}"
+            return f"Error: {str(e)} for compose {json.dumps(data)}"
 
     def get_openapi(self, response_size: int) -> str:
         """{GENERAL_INTRO}
