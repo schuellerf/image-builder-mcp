@@ -61,7 +61,6 @@ class ImageBuilderClient:
 # Store active composes for easy reference
 active_composes: Dict[str, str] = {}
 
-GENERAL_INTRO = "Function for Redhat console.redhat.com image-builder osbuild.org. Interacting with the production API."
 
 class ImageBuilderMCP(FastMCP):
     def __init__(self, client_id: str, client_secret: str, default_response_size: int = 10):
@@ -75,22 +74,105 @@ class ImageBuilderMCP(FastMCP):
         self.default_response_size = default_response_size
         # prepend generic keywords for use of many other tools
         # and register with "self.tool()"
-        tool_functions = [self.get_openapi,
-                          self.create_blueprint,
-                          self.get_blueprints,
-                          self.get_more_blueprints,
-                          self.get_blueprint_details,
+        tool_functions = [#self.get_openapi,
+                          #self.create_blueprint,
+                          #self.get_blueprints,
+                          #self.get_more_blueprints,
+                          #self.get_blueprint_details,
                           self.get_composes,
                           self.get_more_composes,
-                          self.get_compose_details]
+                          self.get_compose_details,
+                          self.compose]
+        
+        if self.client.stage:
+            api_type = "stage"
+        else:
+            api_type = "production"
+        self.distributions = self.client.make_request("/distributions")
+        for d in sorted(self.distributions, key=lambda x: x['name']):
+            print(f"{d['name']}")
+
+        general_intro = f"""Function for Redhat console.redhat.com image-builder osbuild.org.
+        Interacting with the {api_type} API.
+        Use this to create custom Redhat enterprise, Centos or Fedora Linux images."""
+
+        # TBD: get from openapi
+        self.architectures = ["x86_64", "aarch64"]
+
+        # TBD: get from openapi
+        self.image_types = ["aws",
+                            "azure",
+                            "edge-commit",
+                            "edge-installer",
+                            "gcp",
+                            "guest-image",
+                            "image-installer",
+                            "oci"
+                            "vsphere",
+                            "vsphere-ova",
+                            "wsl",
+                            "ami",
+                            "rhel-edge-commit",
+                            "rhel-edge-installer",
+                            "vhd"]
+
         for f in tool_functions:
             self.tool(
-                description=f.__doc__.format(GENERAL_INTRO=GENERAL_INTRO),
+                description=f.__doc__.format(
+                    GENERAL_INTRO=general_intro,
+                    distributions=", ".join([d['name'] for d in self.distributions]),
+                    architectures=", ".join(self.architectures),
+                    image_types=", ".join(self.image_types)
+                ),
                 annotations={
                     "readOnlyHint": True,
                     "openWorldHint": True
                 }
                 )(f)
+
+    def compose(self,
+                distribution: str,
+                architecture: str = "x86_64",
+                image_type: str = "guest-image",
+                image_name: Optional[str] = None,
+                image_description: Optional[str] = None) -> str:
+        """{GENERAL_INTRO}
+        Create a new operating system image. Assure that the data is according to ComposeRequest descriped in openapi.
+        Ask user for more details to be able to fill "data" properly before calling this.
+
+        Args:
+            distribution: the distribution to use (ask for one of {distributions})
+            architecture: the architecture to use (ask for one of {architectures})
+            image_type: the type of image to create (ask for one of {image_types})
+            image_name: optional name for the image (ask if the user wants to set this)
+            image_description: optional description for the image (ask if the user wants to set this)
+        """
+        data = {
+            "distribution": distribution,
+            "image_requests": [
+                {
+                    "architecture": architecture,
+                    "image_type": image_type,
+                    "upload_request": {
+                        "type": "aws.s3",
+                        "options": {}
+                    }
+                }
+            ]
+            #"customizations": {…}
+        }
+        if image_name:
+            data["image_name"] = image_name
+        if image_description:
+            data["image_description"] = image_description
+        try:
+            # TBD: programmatically check against openapi
+            response = self.client.make_request("compose", method="POST", data=data)
+            # Store active compose for easy reference
+            active_composes[response["id"]] = response["image_name"]
+            return f"Compose created successfully: {json.dumps(response)}"
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     def get_openapi(self, response_size: int) -> str:
         """{GENERAL_INTRO}
@@ -377,7 +459,7 @@ class ImageBuilderMCP(FastMCP):
 
     def get_compose_details(self, compose_identifier: str) -> str:
         """{GENERAL_INTRO}
-        Get compose details.
+        Get compose details especially for the status of an image build.
 
         Args:
             compose_identifier: the UUID, name or reply_id to query
