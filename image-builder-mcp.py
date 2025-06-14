@@ -94,7 +94,7 @@ class ImageBuilderMCP(FastMCP):
 
         general_intro = f"""Function for Redhat console.redhat.com image-builder osbuild.org.
         Interacting with the {api_type} API.
-        Use this to create custom Redhat enterprise, Centos or Fedora Linux images."""
+        Use this to create custom Redhat enterprise, Centos or Fedora Linux disk images."""
 
         # TBD: get from openapi
         self.architectures = ["x86_64", "aarch64"]
@@ -163,8 +163,14 @@ class ImageBuilderMCP(FastMCP):
         }
         if image_name:
             data["image_name"] = image_name
+        else:
+            # Generate a default image name based on distribution and architecture
+            data["image_name"] = f"{distribution}-{architecture}-{image_type}-{datetime.now().strftime('%Y%m%d%H%M%S')}-mcp"
         if image_description:
             data["image_description"] = image_description
+        else:
+            # Generate a default image description
+            data["image_description"] = f"Image created via image-builder-mcp on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         try:
             # TBD: programmatically check against openapi
             response = self.client.make_request("compose", method="POST", data=data)
