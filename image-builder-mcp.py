@@ -1,3 +1,4 @@
+import logging
 import os
 import json
 from datetime import datetime, timedelta
@@ -5,6 +6,7 @@ from typing import Annotated, Optional, Dict, Any
 from pydantic import Field
 import requests
 from fastmcp import FastMCP, Context
+import argparse
 
 class ImageBuilderClient:
     def __init__(self, client_id: str, client_secret: str):
@@ -89,8 +91,6 @@ class ImageBuilderMCP(FastMCP):
         else:
             api_type = "production"
         self.distributions = self.client.make_request("/distributions")
-        for d in sorted(self.distributions, key=lambda x: x['name']):
-            print(f"{d['name']}")
 
         general_intro = f"""Function for Redhat console.redhat.com image-builder osbuild.org.
         Interacting with the {api_type} API.
@@ -361,6 +361,7 @@ class ImageBuilderMCP(FastMCP):
     def get_composes(self, response_size: int, search_string: str|None = None) -> str:
         """{GENERAL_INTRO}
         Get all composes without details.
+        Use this to get the latest image builds.
         For "all" set "response_size" to None
         This starts a fresh search.
 
@@ -391,7 +392,7 @@ class ImageBuilderMCP(FastMCP):
             for compose in sorted_data:
                 data = {"reply_id": i,
                         "compose_uuid": compose["id"],
-                        "image_name": compose["image_name"]}
+                        "image_name": compose.get("image_name","")}
 
                 self.composes.append(data)
 
@@ -442,7 +443,7 @@ class ImageBuilderMCP(FastMCP):
             if search_string:
                 search_lower = search_string.lower()
                 filtered_composes = list(filter(
-                    lambda c: search_lower in c["image_name"].lower(),
+                    lambda c: search_lower in c.get("image_name","").lower(),
                     self.composes
                 ))
 
@@ -507,6 +508,12 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run Image Builder MCP server.")
+    parser.add_argument("--sse", action="store_true", help="Use SSE transport instead of stdio")
+    parser.add_argument("--host", default="127.0.0.1", help="Host for SSE transport (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=9000, help="Port for SSE transport (default: 9000)")
+    args = parser.parse_args()
+
     # Get credentials from environment variables or user input
     client_id = os.getenv("IMAGE_BUILDER_CLIENT_ID")
     client_secret = os.getenv("IMAGE_BUILDER_CLIENT_SECRET")
@@ -518,4 +525,12 @@ if __name__ == "__main__":
 
     # Create and run the MCP server
     mcp_server = ImageBuilderMCP(client_id, client_secret)
-    mcp_server.run(transport="sse", host="127.0.0.1", port=9000)
+
+    if args.sse:
+        mcp_server.run(transport="sse", host=args.host, port=args.port)
+    else:
+        if args.host != "127.0.0.1" or args.port != 9000:
+            print("Warning: --host and --port are ignored when not using --sse")
+        # avoid startup message
+        logging.getLogger("FastMCP.fastmcp.server").setLevel("ERROR")
+        mcp_server.run()
