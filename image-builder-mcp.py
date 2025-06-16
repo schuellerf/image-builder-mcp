@@ -15,6 +15,8 @@ class ImageBuilderClient:
         self.token = None
         self.token_expiry = None
         self.stage = False
+        self.logger = logging.getLogger("ImageBuilderClient")
+
         if self.stage:
             # TBD fix stage authentication
             self.domain = "console.stage.redhat.com"
@@ -28,8 +30,9 @@ class ImageBuilderClient:
     def get_token(self) -> str:
         """Get or refresh the authentication token."""
         if self.token and self.token_expiry and datetime.now() < self.token_expiry:
+            self.logger.debug(f"Using cached token valid until {self.token_expiry}")
             return self.token
-
+        self.logger.debug("Fetching new token")
         token_url = f"https://{self.sso_domain}/auth/realms/redhat-external/protocol/openid-connect/token"
         data = {
             "grant_type": "client_credentials",
@@ -53,11 +56,14 @@ class ImageBuilderClient:
             "Authorization": f"Bearer {self.get_token()}",
             "Content-Type": "application/json"
         }
-
         url = f"{self.base_url}/{endpoint}"
+        self.logger.debug(f"Making {method} request to {url} with data {data}")
+
         response = requests.request(method, url, headers=headers, json=data)
         response.raise_for_status()
         ret = response.json()
+        self.logger.debug(f"Response from {url}: {ret}")
+
         return ret
 
 # Store active composes for easy reference
@@ -72,6 +78,7 @@ class ImageBuilderMCP(FastMCP):
         self.composes = None
         self.blueprint_current_index = 0
         self.compose_current_index = 0
+        self.logger = logging.getLogger("ImageBuilderMCP")
 
         self.default_response_size = default_response_size
         # prepend generic keywords for use of many other tools
@@ -512,6 +519,7 @@ if __name__ == "__main__":
     parser.add_argument("--sse", action="store_true", help="Use SSE transport instead of stdio")
     parser.add_argument("--host", default="127.0.0.1", help="Host for SSE transport (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=9000, help="Port for SSE transport (default: 9000)")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     args = parser.parse_args()
 
     # Get credentials from environment variables or user input
@@ -523,6 +531,21 @@ if __name__ == "__main__":
     if not client_secret:
         client_secret = input("Enter your Image Builder client secret: ")
 
+    if args.debug:
+        log_file = "image-builder-mcp.log"
+        file_handler = logging.FileHandler(log_file)
+        format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        formatter = logging.Formatter(format)
+        file_handler.setFormatter(formatter)
+        loggers = [
+            logging.getLogger("ImageBuilderMCP"),
+            logging.getLogger("ImageBuilderClient")
+            ]
+        for logger in loggers:
+            logger.setLevel(logging.DEBUG)
+            logger.addHandler(file_handler)
+            logger.propagate = False
+
     # Create and run the MCP server
     mcp_server = ImageBuilderMCP(client_id, client_secret)
 
@@ -531,6 +554,4 @@ if __name__ == "__main__":
     else:
         if args.host != "127.0.0.1" or args.port != 9000:
             print("Warning: --host and --port are ignored when not using --sse")
-        # avoid startup message
-        logging.getLogger("FastMCP.fastmcp.server").setLevel("ERROR")
         mcp_server.run()
