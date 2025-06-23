@@ -9,12 +9,12 @@ from fastmcp import FastMCP, Context
 import argparse
 
 class ImageBuilderClient:
-    def __init__(self, client_id: str, client_secret: str):
+    def __init__(self, client_id: str, client_secret: str, stage: bool = False):
         self.client_id = client_id
         self.client_secret = client_secret
         self.token = None
         self.token_expiry = None
-        self.stage = False
+        self.stage = stage
         self.logger = logging.getLogger("ImageBuilderClient")
 
         if self.stage:
@@ -71,9 +71,21 @@ active_composes: Dict[str, str] = {}
 
 
 class ImageBuilderMCP(FastMCP):
-    def __init__(self, client_id: str, client_secret: str, default_response_size: int = 10):
-        super().__init__("Image Builder MCP Server")
-        self.client = ImageBuilderClient(client_id, client_secret)
+    def __init__(self, client_id: str, client_secret: str, default_response_size: int = 10, stage: bool = False):
+        if stage:
+            api_type = "stage"
+        else:
+            api_type = "production"
+
+        general_intro = f"""Function for Redhat console.redhat.com image-builder osbuild.org.
+        Interacting with the {api_type} API.
+        Use this to create custom Redhat enterprise, Centos or Fedora Linux disk images."""
+
+        super().__init__(
+            name = "Image Builder MCP Server",
+            instructions= general_intro
+        )
+        self.client = ImageBuilderClient(client_id, client_secret, stage)
         self.blueprints = None
         self.composes = None
         self.blueprint_current_index = 0
@@ -93,15 +105,7 @@ class ImageBuilderMCP(FastMCP):
                           self.get_compose_details,
                           self.compose]
         
-        if self.client.stage:
-            api_type = "stage"
-        else:
-            api_type = "production"
         self.distributions = self.client.make_request("/distributions")
-
-        general_intro = f"""Function for Redhat console.redhat.com image-builder osbuild.org.
-        Interacting with the {api_type} API.
-        Use this to create custom Redhat enterprise, Centos or Fedora Linux disk images."""
 
         # TBD: get from openapi
         self.architectures = ["x86_64", "aarch64"]
@@ -126,7 +130,6 @@ class ImageBuilderMCP(FastMCP):
         for f in tool_functions:
             self.tool(
                 description=f.__doc__.format(
-                    GENERAL_INTRO=general_intro,
                     distributions=", ".join([d['name'] for d in self.distributions]),
                     architectures=", ".join(self.architectures),
                     image_types=", ".join(self.image_types)
@@ -143,8 +146,7 @@ class ImageBuilderMCP(FastMCP):
                 image_type: str = "guest-image",
                 image_name: Optional[str] = None,
                 image_description: Optional[str] = None) -> str:
-        """{GENERAL_INTRO}
-        Create a new operating system image. Assure that the data is according to ComposeRequest descriped in openapi.
+        """Create a new operating system image. Assure that the data is according to ComposeRequest descriped in openapi.
         Ask user for more details to be able to fill "data" properly before calling this.
 
         Args:
@@ -186,8 +188,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)} for compose {json.dumps(data)}"
 
     def get_openapi(self, response_size: int) -> str:
-        """{GENERAL_INTRO}
-        Get OpenAPI spec. Use this to get details e.g for a new blueprint
+        """Get OpenAPI spec. Use this to get details e.g for a new blueprint
 
         Args:
             response_size: number of items returned (use 7 as default)
@@ -206,8 +207,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
     def create_blueprint(self, data: dict) -> str:
-        """{GENERAL_INTRO}
-        Create a new blueprint. Assure that the data is according to CreateBlueprintRequest descriped in openapi.
+        """Create a new blueprint. Assure that the data is according to CreateBlueprintRequest descriped in openapi.
         Ask user for more details to be able to fill "data" properly before calling this.
         """
         try:
@@ -217,8 +217,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
     def get_blueprints(self, response_size: int, search_string: str|None = None) -> str:
-        """{GENERAL_INTRO}
-        Get all blueprints without details.
+        """Get all blueprints without details.
         For "all" set "response_size" to None
         This starts a fresh search.
 
@@ -274,8 +273,7 @@ class ImageBuilderMCP(FastMCP):
 
 
     def get_more_blueprints(self, response_size: int, search_string: str|None = None) -> str:
-        """{GENERAL_INTRO}
-        Get more blueprints without details. To be called after get_blueprints if the user wants more.
+        """Get more blueprints without details. To be called after get_blueprints if the user wants more.
 
         Args:
             response_size: number of items returned (use 7 as default)
@@ -320,8 +318,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
     def get_blueprint_details(self, blueprint_identifier: str) -> str:
-        """{GENERAL_INTRO}
-        Get blueprint details.
+        """Get blueprint details.
 
         Args:
             blueprint_identifier: the UUID, name or reply_id to query
@@ -366,8 +363,7 @@ class ImageBuilderMCP(FastMCP):
 
 
     def get_composes(self, response_size: int, search_string: str|None = None) -> str:
-        """{GENERAL_INTRO}
-        Get all composes without details.
+        """Get all composes without details.
         Use this to get the latest image builds.
         For "all" set "response_size" to None
         This starts a fresh search.
@@ -422,8 +418,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
     def get_more_composes(self, response_size: int, search_string: str|None = None) -> str:
-        """{GENERAL_INTRO}
-        Get more composes without details. To be called after get_composes if the user wants more.
+        """Get more composes without details. To be called after get_composes if the user wants more.
 
         Args:
             response_size: number of items returned (use 7 as default)
@@ -470,8 +465,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
     def get_compose_details(self, compose_identifier: str) -> str:
-        """{GENERAL_INTRO}
-        Get compose details especially for the status of an image build.
+        """Get compose details especially for the status of an image build.
 
         Args:
             compose_identifier: the UUID, name or reply_id to query
