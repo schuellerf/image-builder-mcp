@@ -9,16 +9,22 @@ from fastmcp import FastMCP, Context
 import argparse
 
 class ImageBuilderClient:
-    def __init__(self, client_id: str, client_secret: str, stage: bool = False):
+    def __init__(
+            self,
+            client_id: str,
+            client_secret: str,
+            stage: bool = False,
+            proxy_url: Optional[str] = None
+            ):
         self.client_id = client_id
         self.client_secret = client_secret
         self.token = None
         self.token_expiry = None
         self.stage = stage
+        self.proxy_url = proxy_url
         self.logger = logging.getLogger("ImageBuilderClient")
 
         if self.stage:
-            # TBD fix stage authentication
             self.domain = "console.stage.redhat.com"
             self.sso_domain = "sso.stage.redhat.com"
         else:
@@ -59,7 +65,15 @@ class ImageBuilderClient:
         url = f"{self.base_url}/{endpoint}"
         self.logger.debug(f"Making {method} request to {url} with data {data}")
 
-        response = requests.request(method, url, headers=headers, json=data)
+        proxies = None
+        if self.stage and self.proxy_url:
+            proxy = self.proxy_url
+            proxies = {
+                "http": proxy,
+                "https": proxy
+            }
+
+        response = requests.request(method, url, headers=headers, json=data, proxies=proxies)
         response.raise_for_status()
         ret = response.json()
         self.logger.debug(f"Response from {url}: {ret}")
@@ -71,7 +85,13 @@ active_composes: Dict[str, str] = {}
 
 
 class ImageBuilderMCP(FastMCP):
-    def __init__(self, client_id: str, client_secret: str, default_response_size: int = 10, stage: bool = False):
+    def __init__(
+            self,
+            client_id: str,
+            client_secret: str,
+            default_response_size: int = 10,
+            stage: bool = False,
+            proxy_url: Optional[str] = None):
         if stage:
             api_type = "stage"
         else:
@@ -85,7 +105,7 @@ class ImageBuilderMCP(FastMCP):
             name = "Image Builder MCP Server",
             instructions= general_intro
         )
-        self.client = ImageBuilderClient(client_id, client_secret, stage)
+        self.client = ImageBuilderClient(client_id, client_secret, stage, proxy_url=proxy_url)
         self.blueprints = None
         self.composes = None
         self.blueprint_current_index = 0
