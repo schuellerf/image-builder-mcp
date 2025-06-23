@@ -263,6 +263,7 @@ class ImageBuilderMCP(FastMCP):
                 i += 1
             self.blueprint_current_index = min(i, response_size)
             intro = "[INSTRUCTION] Use the UI_URL to link to the blueprint\n"
+            intro += f"[ANSWER]\n"
             if len(self.blueprints) > len(ret):
                 intro += f"Only {len(ret)} out of {len(self.blueprints)} returned. Ask for more if needed:"
             else:
@@ -395,8 +396,13 @@ class ImageBuilderMCP(FastMCP):
             for compose in sorted_data:
                 data = {"reply_id": i,
                         "compose_uuid": compose["id"],
+                        "blueprint_id": compose.get("blueprint_id", "N/A"),
                         "image_name": compose.get("image_name","")}
 
+                if compose.get("blueprint_id"):
+                    data["blueprint_url"] = f"https://{self.client.domain}/insights/image-builder/imagewizard/{compose['blueprint_id']}"
+                else:
+                    data["blueprint_url"] = "N/A"
                 self.composes.append(data)
 
                 if len(ret) < response_size:
@@ -408,11 +414,11 @@ class ImageBuilderMCP(FastMCP):
 
                 i += 1
             self.compose_current_index = min(i, response_size)
-            intro = ""
+            intro = "[INSTRUCTION] Present a bulleted list and use the blueprint_url to link to the blueprint which created this compose\n"
             if len(self.composes) > len(ret):
-                intro = f"Only {len(ret)} out of {len(self.composes)} returned. Ask for more if needed:"
+                intro += f"Only {len(ret)} out of {len(self.composes)} returned. Ask for more if needed:"
             else:
-                intro = f"All {len(ret)} entries. There are no more."
+                intro += f"All {len(ret)} entries. There are no more."
             return f"{intro}\n{json.dumps(ret)}"
         except Exception as e:
             return f"Error: {str(e)}"
