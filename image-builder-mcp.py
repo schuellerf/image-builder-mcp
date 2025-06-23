@@ -2,6 +2,7 @@ import logging
 import os
 import json
 from datetime import datetime, timedelta
+import sys
 from typing import Annotated, Optional, Dict, Any
 from pydantic import Field
 import requests
@@ -540,11 +541,20 @@ if __name__ == "__main__":
     parser.add_argument("--host", default="127.0.0.1", help="Host for SSE transport (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=9000, help="Port for SSE transport (default: 9000)")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument("--stage", action="store_true", help="Use stage API instead of production API")
     args = parser.parse_args()
 
     # Get credentials from environment variables or user input
     client_id = os.getenv("IMAGE_BUILDER_CLIENT_ID")
     client_secret = os.getenv("IMAGE_BUILDER_CLIENT_SECRET")
+
+    proxy_url = None
+    if args.stage:
+        proxy_url = os.getenv("IMAGE_BUILDER_STAGE_PROXY_URL")
+        if not proxy_url:
+            print("Please set IMAGE_BUILDER_STAGE_PROXY_URL to access the stage API")
+            print("hint: IMAGE_BUILDER_STAGE_PROXY_URL=http://yoursquidproxy…:3128")
+            sys.exit(1)
 
     if not client_id:
         client_id = input("Enter your Image Builder client ID: ")
@@ -567,7 +577,7 @@ if __name__ == "__main__":
             logger.propagate = False
 
     # Create and run the MCP server
-    mcp_server = ImageBuilderMCP(client_id, client_secret)
+    mcp_server = ImageBuilderMCP(client_id, client_secret, stage=args.stage, proxy_url=proxy_url)
 
     if args.sse:
         mcp_server.run(transport="sse", host=args.host, port=args.port)
