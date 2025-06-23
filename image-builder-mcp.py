@@ -125,7 +125,7 @@ class ImageBuilderMCP(FastMCP):
                           self.get_compose_details,
                           self.compose]
         
-        self.distributions = self.client.make_request("/distributions")
+        self.distributions = self.client.make_request("distributions")
 
         # TBD: get from openapi
         self.architectures = ["x86_64", "aarch64"]
