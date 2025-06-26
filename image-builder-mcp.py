@@ -118,9 +118,9 @@ class ImageBuilderMCP(FastMCP):
         # and register with "self.tool()"
         tool_functions = [#self.get_openapi,
                           #self.create_blueprint,
-                          #self.get_blueprints,
-                          #self.get_more_blueprints,
-                          #self.get_blueprint_details,
+                          self.get_blueprints,
+                          self.get_more_blueprints,
+                          self.get_blueprint_details,
                           self.get_composes,
                           self.get_more_composes,
                           self.get_compose_details,
