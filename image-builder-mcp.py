@@ -239,7 +239,9 @@ class ImageBuilderMCP(FastMCP):
                     "The user should to go to https://console.redhat.com to `'YOUR USER' ➡ My User Access ➡ Service Accounts` "\
                     "create a service account and then set the " \
                     "header variables `x-client-ID` and `x-client-secret` in your request.\n" \
+                    "Here is the direct link for the user's convenience: https://console.redhat.com/iam/service-accounts " \
                     "Only describe this, don't expose details about the tool function itself." \
+                    "Don't proceed with the request before this is fixed." \
                     "Error: {str(e)}."
 
     def compose(self,
