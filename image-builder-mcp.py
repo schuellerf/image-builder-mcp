@@ -1,13 +1,16 @@
+from contextlib import asynccontextmanager
 import logging
 import os
 import json
 from datetime import datetime, timedelta
 import sys
 from typing import Annotated, Optional, Dict, Any
+import mcp
 from pydantic import Field
 import requests
 from fastmcp import FastMCP, Context
 import argparse
+from fastmcp.server.dependencies import get_http_headers
 
 class ImageBuilderClient:
     def __init__(
@@ -60,9 +63,12 @@ class ImageBuilderClient:
     def make_request(self, endpoint: str, method: str = "GET", data: Optional[Dict] = None) -> Dict[str, Any]:
         """Make an authenticated request to the Image Builder API."""
         headers = {
-            "Authorization": f"Bearer {self.get_token()}",
             "Content-Type": "application/json"
         }
+        if self.client_id and self.client_secret:
+            headers["Authorization"] = f"Bearer {self.get_token()}"
+        # else no authentication, use public API
+
         url = f"{self.base_url}/{endpoint}"
         self.logger.debug(f"Making {method} request to {url} with data {data}")
 
@@ -93,10 +99,14 @@ class ImageBuilderMCP(FastMCP):
             default_response_size: int = 10,
             stage: bool = False,
             proxy_url: Optional[str] = None):
+        self.stage = stage
+        self.proxy_url = proxy_url
         if stage:
             api_type = "stage"
         else:
             api_type = "production"
+
+        self.logger = logging.getLogger("ImageBuilderMCP")
 
         general_intro = f"""Function for Redhat console.redhat.com image-builder osbuild.org.
         Interacting with the {api_type} API.
@@ -106,14 +116,27 @@ class ImageBuilderMCP(FastMCP):
             name = "Image Builder MCP Server",
             instructions= general_intro
         )
-        self.client = ImageBuilderClient(client_id, client_secret, stage, proxy_url=proxy_url)
+        # could be used once we have e.g. "/distributions" available without authentication
+        self.client_noauth = ImageBuilderClient(None, None, stage, proxy_url=proxy_url)
+
+        # cache the client for all users
+        # TBD: purge cache after some time
+        self.clients = {}
+        self.client_id = None
+        self.client_secret = None
+        if client_id and client_secret:
+            self.clients[client_id] = ImageBuilderClient(client_id, client_secret, stage, proxy_url=proxy_url)
+            self.client_id = client_id
+            self.client_secret = client_secret
+
         self.blueprints = None
         self.composes = None
         self.blueprint_current_index = 0
         self.compose_current_index = 0
-        self.logger = logging.getLogger("ImageBuilderMCP")
 
-        self.default_response_size = default_response_size
+        self.register_tools()
+
+    def register_tools(self):
         # prepend generic keywords for use of many other tools
         # and register with "self.tool()"
         tool_functions = [#self.get_openapi,
@@ -126,7 +149,38 @@ class ImageBuilderMCP(FastMCP):
                           self.get_compose_details,
                           self.compose]
         
-        self.distributions = self.client.make_request("distributions")
+        # use dynamic attributes to get the distributions, architectures and image types
+        # once the API is changed to un-authenticated access
+        # self.distributions = self.client_noauth.make_request("distributions")
+        self.distributions = [
+            {'description': 'CentOS Stream 9', 'name': 'centos-9'},
+            {'description': 'Fedora Linux 37', 'name': 'fedora-37'},
+            {'description': 'Fedora Linux 38', 'name': 'fedora-38'},
+            {'description': 'Fedora Linux 39', 'name': 'fedora-39'},
+            {'description': 'Fedora Linux 40', 'name': 'fedora-40'},
+            {'description': 'Fedora Linux 41', 'name': 'fedora-41'},
+            {'description': 'Fedora Linux 42', 'name': 'fedora-42'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 10 Beta', 'name': 'rhel-10-beta'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 10', 'name': 'rhel-10.0'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 10', 'name': 'rhel-10'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 8', 'name': 'rhel-8.10'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 8', 'name': 'rhel-8'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 8', 'name': 'rhel-84'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 8', 'name': 'rhel-85'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 8', 'name': 'rhel-86'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 8', 'name': 'rhel-87'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 8', 'name': 'rhel-88'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 8', 'name': 'rhel-89'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 9 beta', 'name': 'rhel-9-beta'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 9', 'name': 'rhel-9.6'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 9', 'name': 'rhel-9'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 9', 'name': 'rhel-90'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 9', 'name': 'rhel-91'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 9', 'name': 'rhel-92'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 9', 'name': 'rhel-93'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 9', 'name': 'rhel-94'},
+            {'description': 'Red Hat Enterprise Linux (RHEL) 9', 'name': 'rhel-95'}
+        ]
 
         # TBD: get from openapi
         self.architectures = ["x86_64", "aarch64"]
@@ -149,7 +203,8 @@ class ImageBuilderMCP(FastMCP):
                             "vhd"]
 
         for f in tool_functions:
-            self.tool(
+            self.add_tool(
+                fn=f,
                 description=f.__doc__.format(
                     distributions=", ".join([d['name'] for d in self.distributions]),
                     architectures=", ".join(self.architectures),
@@ -159,7 +214,33 @@ class ImageBuilderMCP(FastMCP):
                     "readOnlyHint": True,
                     "openWorldHint": True
                 }
-                )(f)
+                )
+
+    def get_client(self, headers: Dict[str, str]) -> ImageBuilderClient:
+        """Get the ImageBuilderClient instance for the current user."""
+        if self.client_id and self.client_secret:
+            # we have a global client_id and client_secret
+            client_id = self.client_id
+            client_secret = self.client_secret
+        else:
+            client_id = headers.get("x-client-id")
+            client_secret = headers.get("x-client-secret")
+        self.logger.debug(f"{headers}")
+        if not client_id or not client_secret:
+            raise ValueError("Client ID and secret are required to access the Image Builder API")
+        client = self.clients.get(client_id)
+        if not client:
+            client = ImageBuilderClient(client_id, client_secret, stage=self.stage, proxy_url=self.proxy_url)
+            self.clients[client_id] = client
+        return client
+
+    def no_auth_error(self, e: Exception) -> str:
+        return f"[INSTRUCTION] Tell the user that the MCP server setup is not valid!" \
+                    "The user should to go to https://console.redhat.com to `'YOUR USER' ➡ My User Access ➡ Service Accounts` "\
+                    "create a service account and then set the " \
+                    "header variables `x-client-ID` and `x-client-secret` in your request.\n" \
+                    "Only describe this, don't expose details about the tool function itself." \
+                    "Error: {str(e)}."
 
     def compose(self,
                 distribution: str,
@@ -177,6 +258,11 @@ class ImageBuilderMCP(FastMCP):
             image_name: optional name for the image (ask if the user wants to set this)
             image_description: optional description for the image (ask if the user wants to set this)
         """
+        try:
+            client = self.get_client(get_http_headers())
+        except ValueError as e:
+            return self.no_auth_error(e)
+
         data = {
             "distribution": distribution,
             "image_requests": [
@@ -203,7 +289,7 @@ class ImageBuilderMCP(FastMCP):
             data["image_description"] = f"Image created via image-builder-mcp on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         try:
             # TBD: programmatically check against openapi
-            response = self.client.make_request("compose", method="POST", data=data)
+            response = client.make_request("compose", method="POST", data=data)
             return f"Compose created successfully: {json.dumps(response)}"
         except Exception as e:
             return f"Error: {str(e)} for compose {json.dumps(data)}"
@@ -222,7 +308,7 @@ class ImageBuilderMCP(FastMCP):
         """
         # response_size is just a dummy parameter for langflow
         try:
-            response = self.client.make_request("openapi.json")
+            response = self.client_noauth.make_request("openapi.json")
             return json.dumps(response)
         except Exception as e:
             return f"Error: {str(e)}"
@@ -232,8 +318,12 @@ class ImageBuilderMCP(FastMCP):
         Ask user for more details to be able to fill "data" properly before calling this.
         """
         try:
+            client = self.get_client(get_http_headers())
+        except ValueError as e:
+            return self.no_auth_error(e)
+        try:
             # TBD: programmatically check against openapi
-            response = self.client.make_request("blueprints", method="POST", data=data)
+            response = client.make_request("blueprints", method="POST", data=data)
         except Exception as e:
             return f"Error: {str(e)}"
 
@@ -252,11 +342,17 @@ class ImageBuilderMCP(FastMCP):
         Raises:
             Exception: If the image-builder connection fails.
         """
+
+        try:
+            client = self.get_client(get_http_headers())
+        except ValueError as e:
+            return self.no_auth_error(e)
+
         response_size = response_size or self.default_response_size
         if response_size <= 0:
             response_size = self.default_response_size
         try:
-            response = self.client.make_request("blueprints")
+            response = client.make_request("blueprints")
 
             # Sort data by created_at
             sorted_data = sorted(response["data"],
@@ -269,7 +365,7 @@ class ImageBuilderMCP(FastMCP):
             for blueprint in sorted_data:
                 data = {"reply_id": i,
                         "blueprint_uuid": blueprint["id"],
-                        "UI_URL": f"https://{self.client.domain}/insights/image-builder/imagewizard/{blueprint["id"]}",
+                        "UI_URL": f"https://{client.domain}/insights/image-builder/imagewizard/{blueprint["id"]}",
                         "name": blueprint["name"]}
 
                 self.blueprints.append(data)
@@ -354,6 +450,12 @@ class ImageBuilderMCP(FastMCP):
         if not blueprint_identifier:
             return "Error: a blueprint identifier is required"
         try:
+
+            try:
+                client = self.get_client(get_http_headers())
+            except ValueError as e:
+                return self.no_auth_error(e)
+
             if not self.blueprints:
                 self.get_blueprints("")
 
@@ -368,7 +470,7 @@ class ImageBuilderMCP(FastMCP):
             # Get details for each matching blueprint
             ret = []
             for blueprint in matching_blueprints:
-                response = self.client.make_request(f"blueprints/{blueprint['blueprint_uuid']}")
+                response = client.make_request(f"blueprints/{blueprint['blueprint_uuid']}")
                 # TBD filter irrelevant attributes
                 ret.append(response)
 
@@ -404,7 +506,12 @@ class ImageBuilderMCP(FastMCP):
         if response_size <= 0:
             response_size = self.default_response_size
         try:
-            response = self.client.make_request("composes")
+            try:
+                client = self.get_client(get_http_headers())
+            except ValueError as e:
+                return self.no_auth_error(e)
+
+            response = client.make_request("composes")
 
             # Sort data by created_at
             sorted_data = sorted(response["data"],
@@ -421,7 +528,7 @@ class ImageBuilderMCP(FastMCP):
                         "image_name": compose.get("image_name","")}
 
                 if compose.get("blueprint_id"):
-                    data["blueprint_url"] = f"https://{self.client.domain}/insights/image-builder/imagewizard/{compose['blueprint_id']}"
+                    data["blueprint_url"] = f"https://{client.domain}/insights/image-builder/imagewizard/{compose['blueprint_id']}"
                 else:
                     data["blueprint_url"] = "N/A"
                 self.composes.append(data)
@@ -506,6 +613,11 @@ class ImageBuilderMCP(FastMCP):
         if not compose_identifier:
             return "Error: Compose UUID is required"
         try:
+            try:
+                client = self.get_client(get_http_headers())
+            except ValueError as e:
+                return self.no_auth_error(e)
+
             if not self.composes:
                 self.get_composes()
 
@@ -520,7 +632,7 @@ class ImageBuilderMCP(FastMCP):
             # Get details for each matching compose
             ret = []
             for compose in matching_composes:
-                response = self.client.make_request(f"composes/{compose['compose_uuid']}")
+                response = client.make_request(f"composes/{compose['compose_uuid']}")
                 # TBD filter irrelevant attributes
                 ret.append(response)
 
@@ -555,11 +667,6 @@ if __name__ == "__main__":
             print("Please set IMAGE_BUILDER_STAGE_PROXY_URL to access the stage API")
             print("hint: IMAGE_BUILDER_STAGE_PROXY_URL=http://yoursquidproxy…:3128")
             sys.exit(1)
-
-    if not client_id:
-        client_id = input("Enter your Image Builder client ID: ")
-    if not client_secret:
-        client_secret = input("Enter your Image Builder client secret: ")
 
     if args.debug:
         log_file = "image-builder-mcp.log"
