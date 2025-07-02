@@ -11,6 +11,7 @@ import requests
 from fastmcp import FastMCP, Context
 import argparse
 from fastmcp.server.dependencies import get_http_headers
+from fastmcp.tools.tool import Tool
 
 class ImageBuilderClient:
     def __init__(
@@ -203,18 +204,17 @@ class ImageBuilderMCP(FastMCP):
                             "vhd"]
 
         for f in tool_functions:
-            self.add_tool(
-                fn=f,
-                description=f.__doc__.format(
-                    distributions=", ".join([d['name'] for d in self.distributions]),
-                    architectures=", ".join(self.architectures),
-                    image_types=", ".join(self.image_types)
-                ),
-                annotations={
-                    "readOnlyHint": True,
-                    "openWorldHint": True
-                }
-                )
+            tool = Tool.from_function(f)
+            tool.annotations = {
+                "readOnlyHint": True,
+                "openWorldHint": True
+            }
+            tool.description = f.__doc__.format(
+                distributions=", ".join([d['name'] for d in self.distributions]),
+                architectures=", ".join(self.architectures),
+                image_types=", ".join(self.image_types)
+            )
+            self.add_tool(tool)
 
     def get_client(self, headers: Dict[str, str]) -> ImageBuilderClient:
         """Get the ImageBuilderClient instance for the current user."""
