@@ -652,12 +652,25 @@ class ImageBuilderMCP(FastMCP):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Image Builder MCP server.")
-    parser.add_argument("--sse", action="store_true", help="Use SSE transport instead of stdio")
-    parser.add_argument("--host", default="127.0.0.1", help="Host for SSE transport (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=9000, help="Port for SSE transport (default: 9000)")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--stage", action="store_true", help="Use stage API instead of production API")
+
+    # Create subparsers for different transport modes
+    subparsers = parser.add_subparsers(dest="transport", help="Transport mode")
+
+    # stdio subcommand (default)
+    stdio_parser = subparsers.add_parser("stdio", help="Use stdio transport (default)")
+
+    # sse subcommand
+    sse_parser = subparsers.add_parser("sse", help="Use SSE transport")
+    sse_parser.add_argument("--host", default="127.0.0.1", help="Host for SSE transport (default: 127.0.0.1)")
+    sse_parser.add_argument("--port", type=int, default=9000, help="Port for SSE transport (default: 9000)")
+
     args = parser.parse_args()
+
+    # Default to stdio if no subcommand is provided
+    if args.transport is None:
+        args.transport = "stdio"
 
     # Get credentials from environment variables or user input
     client_id = os.getenv("IMAGE_BUILDER_CLIENT_ID")
@@ -689,9 +702,7 @@ if __name__ == "__main__":
     # Create and run the MCP server
     mcp_server = ImageBuilderMCP(client_id, client_secret, stage=args.stage, proxy_url=proxy_url)
 
-    if args.sse:
+    if args.transport == "sse":
         mcp_server.run(transport="sse", host=args.host, port=args.port)
     else:
-        if args.host != "127.0.0.1" or args.port != 9000:
-            print("Warning: --host and --port are ignored when not using --sse")
         mcp_server.run()
