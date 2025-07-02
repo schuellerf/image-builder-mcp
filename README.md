@@ -10,6 +10,8 @@ Go to https://console.redhat.com to `'YOUR USER' ➡ My User Access ➡ Service 
 and then set the environment variables `IMAGE_BUILDER_CLIENT_ID` and `IMAGE_BUILDER_CLIENT_SECRET` accordingly.
 
 ## Run
+
+### Using Python directly
 Just install the requirements
 
 ```
@@ -19,14 +21,32 @@ pip install -r requirements.txt
 and run
 
 ```
-python image-builder-mcp.py --sse
+python image-builder-mcp.py sse
 ```
 
 This will start image-builder-mcp server at http://localhost:9000/sse
 
-or you can integrate e.g. into vscode without arguments (defaulting to `stdio` transport)
+### Using Podman/Docker
 
-example configuration here could look like this:
+You can also copy the command from the [Makefile]
+For SSE mode:
+```
+make run-sse
+```
+
+You can also copy the command from the [Makefile]
+For stdio mode:
+```
+make run-stdio
+```
+
+## Integrations
+
+### VSCode / Cursor
+for the usage in your project, create a file
+`.vscode/mcp.json` or `.cursor/mcp.json` respectively.
+
+An example configuration here could look like this:
 
 ```
 {
@@ -47,10 +67,9 @@ example configuration here could look like this:
     "servers": {
         "image-builder-mcp-stdio": {
             "type": "stdio",
-            "command": "bash",
+            "command": "podman",
             "args": [
-                "-c",
-                "cd FOLDER_OF_YOUR_GIT_CLONES/image-builder-mcp ; python image-builder-mcp.py"
+                "localhost/image-builder-mcp:latest"
             ],
             "env": {
                 "IMAGE_BUILDER_CLIENT_ID": "${input:image_builder_client_id}",
