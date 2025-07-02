@@ -97,9 +97,11 @@ class ImageBuilderMCP(FastMCP):
             client_secret: str,
             default_response_size: int = 10,
             stage: bool = False,
-            proxy_url: Optional[str] = None):
+            proxy_url: Optional[str] = None,
+            transport: Optional[str] = None):
         self.stage = stage
         self.proxy_url = proxy_url
+        self.transport = transport
         if stage:
             api_type = "stage"
         else:
@@ -234,11 +236,22 @@ class ImageBuilderMCP(FastMCP):
         return client
 
     def no_auth_error(self, e: Exception) -> str:
-        return f"[INSTRUCTION] Tell the user that the MCP server setup is not valid!" \
-                    "The user should to go to https://console.redhat.com to `'YOUR USER' ➡ My User Access ➡ Service Accounts` "\
+        if self.transport == "sse":
+            return f"[INSTRUCTION] Tell the user that the MCP server setup is not valid!" \
+                    "The user should to go to [https://console.redhat.com](https://console.redhat.com) to `'YOUR USER' ➡ My User Access ➡ Service Accounts` "\
                     "create a service account and then set the " \
                     "header variables `x-client-ID` and `x-client-secret` in your request.\n" \
-                    "Here is the direct link for the user's convenience: https://console.redhat.com/iam/service-accounts " \
+                    "Here is the direct link for the user's convenience: [https://console.redhat.com/iam/service-accounts](https://console.redhat.com/iam/service-accounts) " \
+                    "Come up with a detailed description of this for the user. " \
+                    "Only describe this, don't expose details about the tool function itself." \
+                    "Don't proceed with the request before this is fixed." \
+                    "Error: {str(e)}."
+        else:
+            return f"[INSTRUCTION] Tell the user that the MCP server setup is not valid!" \
+                    "The user should to go to [https://console.redhat.com](https://console.redhat.com) to `'YOUR USER' ➡ My User Access ➡ Service Accounts` "\
+                    "create a service account and then set the " \
+                    "`IMAGE_BUILDER_CLIENT_ID` and `IMAGE_BUILDER_CLIENT_SECRET` in your mcp.json config.\n" \
+                    "Here is the direct link for the user's convenience: [https://console.redhat.com/iam/service-accounts](https://console.redhat.com/iam/service-accounts) " \
                     "Come up with a detailed description of this for the user. " \
                     "Only describe this, don't expose details about the tool function itself." \
                     "Don't proceed with the request before this is fixed." \
@@ -699,7 +712,7 @@ if __name__ == "__main__":
             logger.propagate = False
 
     # Create and run the MCP server
-    mcp_server = ImageBuilderMCP(client_id, client_secret, stage=args.stage, proxy_url=proxy_url)
+    mcp_server = ImageBuilderMCP(client_id, client_secret, stage=args.stage, proxy_url=proxy_url, transport=args.transport)
 
     if args.transport == "sse":
         mcp_server.run(transport="sse", host=args.host, port=args.port)
