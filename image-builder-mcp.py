@@ -5,7 +5,7 @@ import os
 import requests
 import sys
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
@@ -122,15 +122,17 @@ class ImageBuilderMCP(FastMCP):
         self.clients = {}
         self.client_id = None
         self.client_secret = None
+
+        self.blueprints = {}
+        self.composes = {}
+        self.blueprint_current_index = {}
+        self.compose_current_index = {}
+
         if client_id and client_secret:
             self.clients[client_id] = ImageBuilderClient(client_id, client_secret, stage, proxy_url=proxy_url)
             self.client_id = client_id
             self.client_secret = client_secret
 
-        self.blueprints = None
-        self.composes = None
-        self.blueprint_current_index = 0
-        self.compose_current_index = 0
 
         self.register_tools()
 
@@ -214,18 +216,19 @@ class ImageBuilderMCP(FastMCP):
             tool.title = tool.description.split("\n")[0]
             self.add_tool(tool)
 
-    def get_client(self, headers: Dict[str, str]) -> ImageBuilderClient:
-        """Get the ImageBuilderClient instance for the current user."""
-        if self.client_id and self.client_secret:
-            # we have a global client_id and client_secret
-            client_id = self.client_id
-            client_secret = self.client_secret
-        else:
-            client_id = headers.get("x-client-id")
-            client_secret = headers.get("x-client-secret")
+    def get_client_id_and_secret(self, headers: Dict[str, str]) -> Tuple[str, str]:
+        """Get the client ID and secret preferably from the headers."""
+        client_id = headers.get("x-client-id") or self.client_id
+        client_secret = headers.get("x-client-secret") or self.client_secret
         self.logger.debug(f"request headers: {headers}")
+
         if not client_id or not client_secret:
             raise ValueError("Client ID and secret are required to access the Image Builder API")
+        return client_id, client_secret
+
+    def get_client(self, headers: Dict[str, str]) -> ImageBuilderClient:
+        """Get the ImageBuilderClient instance for the current user."""
+        client_id, client_secret = self.get_client_id_and_secret(headers)
         client = self.clients.get(client_id)
         if not client:
             client = ImageBuilderClient(client_id, client_secret, stage=self.stage, proxy_url=self.proxy_url)
@@ -343,6 +346,7 @@ class ImageBuilderMCP(FastMCP):
         """Get all blueprints without details.
         For "all" set "response_size" to None
         This starts a fresh search.
+        Call get_more_blueprints to get more.
 
         Args:
             response_size: number of items returned (use 7 as default)
@@ -377,14 +381,14 @@ class ImageBuilderMCP(FastMCP):
 
             ret = []
             i = 1
-            self.blueprints = []
+            self.blueprints[client.client_id] = []
             for blueprint in sorted_data:
                 data = {"reply_id": i,
                         "blueprint_uuid": blueprint["id"],
                         "UI_URL": f"https://{client.domain}/insights/image-builder/imagewizard/{blueprint["id"]}",
                         "name": blueprint["name"]}
 
-                self.blueprints.append(data)
+                self.blueprints[client.client_id].append(data)
 
                 if len(ret) < response_size:
                     if search_string:
@@ -394,11 +398,11 @@ class ImageBuilderMCP(FastMCP):
                         ret.append(data)
 
                 i += 1
-            self.blueprint_current_index = min(i, response_size)
+            self.blueprint_current_index[client.client_id] = min(i, response_size+1)
             intro = "[INSTRUCTION] Use the UI_URL to link to the blueprint\n"
             intro += f"[ANSWER]\n"
-            if len(self.blueprints) > len(ret):
-                intro += f"Only {len(ret)} out of {len(self.blueprints)} returned. Ask for more if needed:"
+            if len(self.blueprints[client.client_id]) > len(ret):
+                intro += f"Only {len(ret)} out of {len(self.blueprints[client.client_id])} returned. Ask for more if needed:"
             else:
                 intro += f"All {len(ret)} entries. There are no more."
             return f"{intro}\n{json.dumps(ret)}"
@@ -407,7 +411,7 @@ class ImageBuilderMCP(FastMCP):
 
 
     def get_more_blueprints(self, response_size: int, search_string: str|None = None) -> str:
-        """Get more blueprints without details. To be called after get_blueprints if the user wants more.
+        """Get more blueprints without details.
 
         Args:
             response_size: number of items returned (use 7 as default)
@@ -423,28 +427,29 @@ class ImageBuilderMCP(FastMCP):
         if response_size <= 0:
             response_size = self.default_response_size
         try:
-            if not self.blueprints:
-                self.get_blueprints()
+            client_id, _ = self.get_client_id_and_secret(get_http_headers())
+            if not self.blueprints[client_id]:
+                self.get_blueprints(response_size, search_string)
 
-            if self.blueprint_current_index >= len(self.blueprints):
-                return "There are no more blueprints. Should I start a fresh search?"
+            if self.blueprint_current_index[client_id] >= len(self.blueprints[client_id]):
+                return "There are no more blueprints. Should I start a fresh search with get_blueprints?"
 
             i = 1
             ret = []
-            for blueprint in self.blueprints:
+            for blueprint in self.blueprints[client_id]:
                 i += 1
-                if i > self.blueprint_current_index and len(ret) < response_size:
+                if i > self.blueprint_current_index[client_id] and len(ret) < response_size:
                     if search_string:
                         if search_string.lower() in blueprint["name"].lower():
                             ret.append(blueprint)
                     else:
                         ret.append(blueprint)
 
-            self.blueprint_current_index = min(self.blueprint_current_index + len(ret), len(self.blueprints))
+            self.blueprint_current_index[client_id] = min(self.blueprint_current_index[client_id] + len(ret), len(self.blueprints[client_id]))
 
             intro = ""
-            if len(self.blueprints) > len(ret):
-                intro = f"Only {len(ret)} out of {len(self.blueprints)} returned. Ask for more if needed:"
+            if len(self.blueprints[client_id]) > len(ret):
+                intro = f"Only {len(ret)} out of {len(self.blueprints[client_id])} returned. Ask for more if needed:"
             else:
                 intro = f"All {len(ret)} entries. There are no more."
             return f"{intro}\n{json.dumps(ret)}"
@@ -472,15 +477,17 @@ class ImageBuilderMCP(FastMCP):
             except ValueError as e:
                 return self.no_auth_error(e)
 
-            if not self.blueprints:
-                self.get_blueprints("")
+            client_id, _ = self.get_client_id_and_secret(get_http_headers())
+            if not self.blueprints[client_id]:
+                # get one blueprint as this just updates the index
+                self.get_blueprints(1)
 
             # Find matching blueprints using filter
             matching_blueprints = list(filter(
                 lambda b: (b["name"] == blueprint_identifier or
                           b["blueprint_uuid"] == blueprint_identifier or
                           str(b["reply_id"]) == blueprint_identifier),
-                self.blueprints
+                self.blueprints[client_id]
             ))
 
             # Get details for each matching blueprint
@@ -536,7 +543,7 @@ class ImageBuilderMCP(FastMCP):
 
             ret = []
             i = 1
-            self.composes = []
+            self.composes[client.client_id] = []
             for compose in sorted_data:
                 data = {"reply_id": i,
                         "compose_uuid": compose["id"],
@@ -547,7 +554,7 @@ class ImageBuilderMCP(FastMCP):
                     data["blueprint_url"] = f"https://{client.domain}/insights/image-builder/imagewizard/{compose['blueprint_id']}"
                 else:
                     data["blueprint_url"] = "N/A"
-                self.composes.append(data)
+                self.composes[client.client_id].append(data)
 
                 if len(ret) < response_size:
                     if search_string:
@@ -557,10 +564,10 @@ class ImageBuilderMCP(FastMCP):
                         ret.append(data)
 
                 i += 1
-            self.compose_current_index = min(i, response_size)
+            self.compose_current_index[client.client_id] = min(i, response_size + 1)
             intro = "[INSTRUCTION] Present a bulleted list and use the blueprint_url to link to the blueprint which created this compose\n"
-            if len(self.composes) > len(ret):
-                intro += f"Only {len(ret)} out of {len(self.composes)} returned. Ask for more if needed:"
+            if len(self.composes[client.client_id]) > len(ret):
+                intro += f"Only {len(ret)} out of {len(self.composes[client.client_id])} returned. Ask for more if needed:"
             else:
                 intro += f"All {len(ret)} entries. There are no more."
             return f"{intro}\n{json.dumps(ret)}"
@@ -584,28 +591,29 @@ class ImageBuilderMCP(FastMCP):
         if response_size <= 0:
             response_size = self.default_response_size
         try:
-            if not self.composes:
-                self.get_composes()
+            client_id, _ = self.get_client_id_and_secret(get_http_headers())
+            if not self.composes[client_id]:
+                self.get_composes(response_size, search_string)
 
-            if self.compose_current_index >= len(self.composes):
+            if self.compose_current_index[client_id] >= len(self.composes[client_id]):
                 return "There are no more composes. Should I start a fresh search?"
 
             # Filter composes if search_string is provided
-            filtered_composes = self.composes
+            filtered_composes = self.composes[client_id]
             if search_string:
                 search_lower = search_string.lower()
                 filtered_composes = list(filter(
                     lambda c: search_lower in c.get("image_name","").lower(),
-                    self.composes
+                    self.composes[client_id]
                 ))
 
             # Get the next batch of items
-            ret = filtered_composes[self.compose_current_index:self.compose_current_index + response_size]
-            self.compose_current_index = min(self.compose_current_index + len(ret), len(self.composes))
+            ret = filtered_composes[self.compose_current_index[client_id]:self.compose_current_index[client_id] + response_size]
+            self.compose_current_index[client_id] = min(self.compose_current_index[client_id] + len(ret), len(self.composes[client_id]))
 
             # Prepare response message
             intro = ""
-            if len(filtered_composes) > self.compose_current_index:
+            if len(filtered_composes) > self.compose_current_index[client_id]:
                 intro = f"Only {len(ret)} out of {len(filtered_composes)} returned. Ask for more if needed:"
             else:
                 intro = f"All {len(ret)} entries. There are no more."
@@ -634,15 +642,17 @@ class ImageBuilderMCP(FastMCP):
             except ValueError as e:
                 return self.no_auth_error(e)
 
-            if not self.composes:
-                self.get_composes()
+            client_id, _ = self.get_client_id_and_secret(get_http_headers())
+            if not self.composes[client_id]:
+                # get one compose as this just updates the index
+                self.get_composes(1)
 
             # Find matching composes using filter
             matching_composes = list(filter(
                 lambda c: (c["image_name"] == compose_identifier or
                           c["compose_uuid"] == compose_identifier or
                           str(c["reply_id"]) == compose_identifier),
-                self.composes
+                self.composes[client_id]
             ))
 
             # Get details for each matching compose
