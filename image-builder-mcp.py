@@ -86,9 +86,6 @@ class ImageBuilderClient:
 
         return ret
 
-# Store active composes for easy reference
-active_composes: Dict[str, str] = {}
-
 
 class ImageBuilderMCP(FastMCP):
     def __init__(
