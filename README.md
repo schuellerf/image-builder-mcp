@@ -42,9 +42,8 @@ make run-stdio
 
 ## Integrations
 
-### VSCode / Cursor
-for the usage in your project, create a file
-`.vscode/mcp.json` or `.cursor/mcp.json` respectively.
+### VSCode
+for the usage in your project, create a file `.vscode/mcp.json`
 
 An example configuration here could look like this:
 
@@ -69,7 +68,14 @@ An example configuration here could look like this:
             "type": "stdio",
             "command": "podman",
             "args": [
-                "localhost/image-builder-mcp:latest"
+                "run",
+                "--env",
+                "IMAGE_BUILDER_CLIENT_ID",
+                "--env",
+                "IMAGE_BUILDER_CLIENT_SECRET",
+                "--interactive",
+                "--rm",
+                "ghcr.io/schuellerf/image-builder-mcp:latest"
             ],
             "env": {
                 "IMAGE_BUILDER_CLIENT_ID": "${input:image_builder_client_id}",
@@ -77,5 +83,33 @@ An example configuration here could look like this:
             }
         }
     }
+}
+```
+
+### Cursor
+
+To start the integration create a file `~/.cursor/mcp.json` with
+```
+{
+  "mcpServers": {
+    "image-builder-mcp-stdio": {
+        "type": "stdio",
+        "command": "podman",
+        "args": [
+            "run",
+            "--env",
+            "IMAGE_BUILDER_CLIENT_ID",
+            "--env",
+            "IMAGE_BUILDER_CLIENT_SECRET",
+            "--interactive",
+            "--rm",
+            "ghcr.io/schuellerf/image-builder-mcp:latest"
+        ],
+        "env": {
+            "IMAGE_BUILDER_CLIENT_ID": "YOUR_ID HERE",
+            "IMAGE_BUILDER_CLIENT_SECRET": "YOUR_SECRET HERE"
+        }
+    }
+  }
 }
 ```
