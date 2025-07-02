@@ -43,9 +43,8 @@ make run-stdio
 ## Integrations
 
 ### VSCode
-for the usage in your project, create a file `.vscode/mcp.json`
-
-An example configuration here could look like this:
+For the usage in your project, create a file called `.vscode/mcp.json` with
+the following content.
 
 ```
 {
@@ -88,6 +87,7 @@ An example configuration here could look like this:
 
 ### Cursor
 
+Cursor doesn't seem to support `inputs` you need to add your credentials in the config file.
 To start the integration create a file `~/.cursor/mcp.json` with
 ```
 {
