@@ -360,6 +360,10 @@ class ImageBuilderMCP(FastMCP):
         except ValueError as e:
             return self.no_auth_error(e)
 
+        # workaround seen in LLama 3.3 70B Instruct
+        if search_string == "null":
+            search_string = None
+
         response_size = response_size or self.default_response_size
         if response_size <= 0:
             response_size = self.default_response_size
