@@ -212,6 +212,7 @@ class ImageBuilderMCP(FastMCP):
                 architectures=", ".join(self.architectures),
                 image_types=", ".join(self.image_types)
             )
+            tool.title = tool.description.split("\n")[0]
             self.add_tool(tool)
 
     def get_client(self, headers: Dict[str, str]) -> ImageBuilderClient:
