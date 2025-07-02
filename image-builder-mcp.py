@@ -1,15 +1,13 @@
-from contextlib import asynccontextmanager
+import argparse
+import json
 import logging
 import os
-import json
-from datetime import datetime, timedelta
-import sys
-from typing import Annotated, Optional, Dict, Any
-import mcp
-from pydantic import Field
 import requests
-from fastmcp import FastMCP, Context
-import argparse
+import sys
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
+from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
 from fastmcp.tools.tool import Tool
 
