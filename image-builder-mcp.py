@@ -226,7 +226,7 @@ class ImageBuilderMCP(FastMCP):
         else:
             client_id = headers.get("x-client-id")
             client_secret = headers.get("x-client-secret")
-        self.logger.debug(f"{headers}")
+        self.logger.debug(f"request headers: {headers}")
         if not client_id or not client_secret:
             raise ValueError("Client ID and secret are required to access the Image Builder API")
         client = self.clients.get(client_id)
@@ -697,19 +697,9 @@ if __name__ == "__main__":
             sys.exit(1)
 
     if args.debug:
-        log_file = "image-builder-mcp.log"
-        file_handler = logging.FileHandler(log_file)
-        format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        formatter = logging.Formatter(format)
-        file_handler.setFormatter(formatter)
-        loggers = [
-            logging.getLogger("ImageBuilderMCP"),
-            logging.getLogger("ImageBuilderClient")
-            ]
-        for logger in loggers:
-            logger.setLevel(logging.DEBUG)
-            logger.addHandler(file_handler)
-            logger.propagate = False
+        logging.getLogger("ImageBuilderMCP").setLevel(logging.DEBUG)
+        logging.getLogger("ImageBuilderClient").setLevel(logging.DEBUG)
+        logging.info("Debug mode enabled")
 
     # Create and run the MCP server
     mcp_server = ImageBuilderMCP(client_id, client_secret, stage=args.stage, proxy_url=proxy_url, transport=args.transport)
