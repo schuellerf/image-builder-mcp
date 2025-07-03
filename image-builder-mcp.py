@@ -538,6 +538,7 @@ class ImageBuilderMCP(FastMCP):
         Use this to get the latest image builds.
         For "all" set "response_size" to None
         This starts a fresh search.
+        Call get_more_composes to get more.
 
         Args:
             response_size: number of items returned (use 7 as default)
@@ -599,7 +600,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
     def get_more_composes(self, response_size: int, search_string: str|None = None) -> str:
-        """Get more composes without details. To be called after get_composes if the user wants more.
+        """Get more composes without details.
 
         Args:
             response_size: number of items returned (use 7 as default)
