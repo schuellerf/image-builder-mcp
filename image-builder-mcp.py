@@ -17,7 +17,8 @@ class ImageBuilderClient:
             client_id: str,
             client_secret: str,
             stage: bool = False,
-            proxy_url: Optional[str] = None
+            proxy_url: Optional[str] = None,
+            image_builder_mcp_client_id: str = "mcp"
             ):
         self.client_id = client_id
         self.client_secret = client_secret
@@ -25,6 +26,7 @@ class ImageBuilderClient:
         self.token_expiry = None
         self.stage = stage
         self.proxy_url = proxy_url
+        self.image_builder_mcp_client_id = image_builder_mcp_client_id
         self.logger = logging.getLogger("ImageBuilderClient")
 
         if self.stage:
@@ -62,7 +64,8 @@ class ImageBuilderClient:
     def make_request(self, endpoint: str, method: str = "GET", data: Optional[Dict] = None) -> Dict[str, Any]:
         """Make an authenticated request to the Image Builder API."""
         headers = {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "X-ImageBuilder-ui": self.image_builder_mcp_client_id
         }
         if self.client_id and self.client_secret:
             headers["Authorization"] = f"Bearer {self.get_token()}"
@@ -99,6 +102,10 @@ class ImageBuilderMCP(FastMCP):
         self.stage = stage
         self.proxy_url = proxy_url
         self.transport = transport
+        # TBD: make this configurable
+        # probably we want to destiguish a hosted MCP server from
+        # a local one (deployed by a customer)
+        self.image_builder_mcp_client_id = "mcp"
         if stage:
             api_type = "stage"
         else:
@@ -115,7 +122,13 @@ class ImageBuilderMCP(FastMCP):
             instructions= general_intro
         )
         # could be used once we have e.g. "/distributions" available without authentication
-        self.client_noauth = ImageBuilderClient(None, None, stage, proxy_url=proxy_url)
+        self.client_noauth = ImageBuilderClient(
+            client_id=None,
+            client_secret=None,
+            stage=self.stage,
+            proxy_url=self.proxy_url,
+            image_builder_mcp_client_id=self.image_builder_mcp_client_id
+        )
 
         # cache the client for all users
         # TBD: purge cache after some time
@@ -129,10 +142,15 @@ class ImageBuilderMCP(FastMCP):
         self.compose_current_index = {}
 
         if client_id and client_secret:
-            self.clients[client_id] = ImageBuilderClient(client_id, client_secret, stage, proxy_url=proxy_url)
+            self.clients[client_id] = ImageBuilderClient(
+                client_id,
+                client_secret,
+                stage=self.stage,
+                proxy_url=self.proxy_url,
+                image_builder_mcp_client_id=self.image_builder_mcp_client_id
+            )
             self.client_id = client_id
             self.client_secret = client_secret
-
 
         self.register_tools()
 
@@ -231,7 +249,12 @@ class ImageBuilderMCP(FastMCP):
         client_id, client_secret = self.get_client_id_and_secret(headers)
         client = self.clients.get(client_id)
         if not client:
-            client = ImageBuilderClient(client_id, client_secret, stage=self.stage, proxy_url=self.proxy_url)
+            client = ImageBuilderClient(
+                client_id,
+                client_secret,
+                stage=self.stage,
+                proxy_url=self.proxy_url,
+                image_builder_mcp_client_id=self.image_builder_mcp_client_id)
             self.clients[client_id] = client
         return client
 
@@ -280,6 +303,7 @@ class ImageBuilderMCP(FastMCP):
 
         data = {
             "distribution": distribution,
+            "client_id": self.image_builder_mcp_client_id,
             "image_requests": [
                 {
                     "architecture": architecture,
