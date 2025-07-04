@@ -699,7 +699,23 @@ class ImageBuilderMCP(FastMCP):
                 intro = f"Found {len(ret)} composes for '{compose_identifier}'.\n"
             for compose in ret:
                 download_url = compose.get("image_status",{}).get("upload_status",{}).get("options",{}).get("url")
-                if download_url:
+                upload_target = compose.get("image_status",{}).get("upload_status",{}).get("type")
+
+                if download_url and upload_target == "oci.objectstorage":
+                    intro += """
+[INSTRUCTION] Leave the URL as code block so the user can copy and paste it.
+
+To run the image copy the link below and follow the steps below:
+
+   * Go to "Compute" in Oracle Cloud and choose "Custom Images".
+   * Click on "Import image", choose "Import from an object storage URL".
+   * Choose "Import from an object storage URL" and paste the URL in the "Object Storage URL" field. The image type has to be set to QCOW2 and the launch mode should be paravirtualized.
+
+```
+{download_url}
+```
+"""
+                elif download_url:
                     intro += f"The image is available at [{download_url}]({download_url})\n"
                     intro += "Always present this link to the user\n"
                 # else depends on the status and the target if it can be downloaded
