@@ -667,9 +667,9 @@ class ImageBuilderMCP(FastMCP):
                 return self.no_auth_error(e)
 
             client_id, _ = self.get_client_id_and_secret(get_http_headers())
-            if not self.composes[client_id]:
+            if not self.composes.get(client_id):
                 # get one compose as this just updates the index
-                self.get_composes(1)
+                self.get_composes(self.default_response_size)
 
             # Find matching composes using filter
             matching_composes = list(filter(
