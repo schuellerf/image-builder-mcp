@@ -80,7 +80,7 @@ the following content.
                 "IMAGE_BUILDER_CLIENT_SECRET",
                 "--interactive",
                 "--rm",
-                "ghcr.io/schuellerf/image-builder-mcp:latest"
+                "ghcr.io/osbuild/image-builder-mcp:latest"
             ],
             "env": {
                 "IMAGE_BUILDER_CLIENT_ID": "${input:image_builder_client_id}",
@@ -109,7 +109,7 @@ To start the integration create a file `~/.cursor/mcp.json` with
             "IMAGE_BUILDER_CLIENT_SECRET",
             "--interactive",
             "--rm",
-            "ghcr.io/schuellerf/image-builder-mcp:latest"
+            "ghcr.io/osbuild/image-builder-mcp:latest"
         ],
         "env": {
             "removeprefix_IMAGE_BUILDER_CLIENT_ID": "YOUR_ID here, then remove 'removeprefix_'",

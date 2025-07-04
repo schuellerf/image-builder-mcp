@@ -36,9 +36,9 @@ dev = [
 image-builder-mcp = "image_builder_mcp.server:main"
 
 [project.urls]
-Homepage = "https://github.com/schuellerf/image-builder-mcp"
-Repository = "https://github.com/schuellerf/image-builder-mcp"
-Issues = "https://github.com/schuellerf/image-builder-mcp/issues"
+Homepage = "https://github.com/osbuild/image-builder-mcp"
+Repository = "https://github.com/osbuild/image-builder-mcp"
+Issues = "https://github.com/osbuild/image-builder-mcp/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

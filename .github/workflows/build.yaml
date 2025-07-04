@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build-image:
@@ -26,9 +27,15 @@ jobs:
         run: |
           podman build --platform=linux/amd64,linux/arm64 --jobs=2 --manifest ib-mcp .
 
+      - name: Generate tag
+        id: tag
+        run: |
+          TAG=$(date +%Y%m%d-%H%M%S)-${GITHUB_SHA::8}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
       - name: Push
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io -u $ --password-stdin
-          podman manifest push --all --format v2s2 ib-mcp ghcr.io/${{ github.repository }}:${{ github.sha }}
+          podman manifest push --all --format v2s2 ib-mcp ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.tag }}
           podman manifest push --all --format v2s2 ib-mcp ghcr.io/${{ github.repository }}:latest
