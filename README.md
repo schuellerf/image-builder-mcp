@@ -98,7 +98,7 @@ To start the integration create a file `~/.cursor/mcp.json` with
 ```
 {
   "mcpServers": {
-    "image-builder-mcp-stdio": {
+    "image-builder-mcp": {
         "type": "stdio",
         "command": "podman",
         "args": [
@@ -112,8 +112,8 @@ To start the integration create a file `~/.cursor/mcp.json` with
             "ghcr.io/schuellerf/image-builder-mcp:latest"
         ],
         "env": {
-            "IMAGE_BUILDER_CLIENT_ID": "YOUR_ID HERE",
-            "IMAGE_BUILDER_CLIENT_SECRET": "YOUR_SECRET HERE"
+            "removeprefix_IMAGE_BUILDER_CLIENT_ID": "YOUR_ID here, then remove 'removeprefix_'",
+            "removeprefix_IMAGE_BUILDER_CLIENT_SECRET": "YOUR_SECRET here, then remove 'removeprefix_'"
         }
     }
   }
