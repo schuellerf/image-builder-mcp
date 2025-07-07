@@ -28,6 +28,6 @@ def test_client_credentials():
 def mock_http_headers(test_client_credentials):
     """Mock HTTP headers with test credentials."""
     return {
-        'x-client-id': test_client_credentials['client_id'],
-        'x-client-secret': test_client_credentials['client_secret']
+        'image-builder-client-id': test_client_credentials['client_id'],
+        'image-builder-client-secret': test_client_credentials['client_secret']
     } 

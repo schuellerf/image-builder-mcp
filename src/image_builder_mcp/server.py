@@ -164,8 +164,8 @@ class ImageBuilderMCP(FastMCP):
 
     def get_client_id_and_secret(self, headers: Dict[str, str]) -> Tuple[str, str]:
         """Get the client ID and secret preferably from the headers."""
-        client_id = headers.get("x-client-id") or self.client_id
-        client_secret = headers.get("x-client-secret") or self.client_secret
+        client_id = headers.get("image-builder-client-id") or self.client_id
+        client_secret = headers.get("image-builder-client-secret") or self.client_secret
         self.logger.debug(f"get_client_id_and_secret request headers: {headers}")
 
         if not client_id or not client_secret:
@@ -191,7 +191,7 @@ class ImageBuilderMCP(FastMCP):
             return f"[INSTRUCTION] Tell the user that the MCP server setup is not valid!" \
                     "The user should to go to [https://console.redhat.com](https://console.redhat.com) to `'YOUR USER' ➡ My User Access ➡ Service Accounts` " \
                     "create a service account and then set the " \
-                    "header variables `x-client-ID` and `x-client-secret` in your request.\n" \
+                    "header variables `image-builder-client-id` and `image-builder-client-secret` in your request.\n" \
                     "Here is the direct link for the user's convenience: [https://console.redhat.com/iam/service-accounts](https://console.redhat.com/iam/service-accounts) " \
                     "Come up with a detailed description of this for the user. " \
                     "Only describe this, don't expose details about the tool function itself." \

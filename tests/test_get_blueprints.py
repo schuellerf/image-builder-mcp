@@ -70,8 +70,8 @@ class TestGetBlueprints:
         # Setup mocks
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
             mock_headers.return_value = {
-                'x-client-id': 'test-client-id',
-                'x-client-secret': 'test-client-secret'
+                'image-builder-client-id': 'test-client-id',
+                'image-builder-client-secret': 'test-client-secret'
             }
             mock_client.make_request.return_value = mock_api_response
             mcp_server.clients['test-client-id'] = mock_client
@@ -127,8 +127,8 @@ class TestGetBlueprints:
         # Setup mocks
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
             mock_headers.return_value = {
-                'x-client-id': 'test-client-id',
-                'x-client-secret': 'test-client-secret'
+                'image-builder-client-id': 'test-client-id',
+                'image-builder-client-secret': 'test-client-secret'
             }
             mock_client.make_request.return_value = mock_api_response
             mcp_server.clients['test-client-id'] = mock_client
@@ -151,8 +151,8 @@ class TestGetBlueprints:
         # Setup mocks
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
             mock_headers.return_value = {
-                'x-client-id': 'test-client-id',
-                'x-client-secret': 'test-client-secret'
+                'image-builder-client-id': 'test-client-id',
+                'image-builder-client-secret': 'test-client-secret'
             }
             mock_client.make_request.return_value = mock_api_response
             mcp_server.clients['test-client-id'] = mock_client
@@ -176,8 +176,8 @@ class TestGetBlueprints:
         # Setup mocks
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
             mock_headers.return_value = {
-                'x-client-id': 'test-client-id',
-                'x-client-secret': 'test-client-secret'
+                'image-builder-client-id': 'test-client-id',
+                'image-builder-client-secret': 'test-client-secret'
             }
             mock_client.make_request.return_value = mock_api_response
             mcp_server.clients['test-client-id'] = mock_client
@@ -202,8 +202,8 @@ class TestGetBlueprints:
         # Setup mocks
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
             mock_headers.return_value = {
-                'x-client-id': 'test-client-id',
-                'x-client-secret': 'test-client-secret'
+                'image-builder-client-id': 'test-client-id',
+                'image-builder-client-secret': 'test-client-secret'
             }
             mock_client.make_request.return_value = {"data": []}
             mcp_server.clients['test-client-id'] = mock_client
@@ -220,8 +220,8 @@ class TestGetBlueprints:
         # Setup mocks
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
             mock_headers.return_value = {
-                'x-client-id': 'test-client-id',
-                'x-client-secret': 'test-client-secret'
+                'image-builder-client-id': 'test-client-id',
+                'image-builder-client-secret': 'test-client-secret'
             }
             mock_client.make_request.side_effect = Exception("API Error")
             mcp_server.clients['test-client-id'] = mock_client
@@ -250,8 +250,8 @@ class TestGetBlueprints:
         # Setup mocks
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
             mock_headers.return_value = {
-                'x-client-id': 'test-client-id',
-                'x-client-secret': 'test-client-secret'
+                'image-builder-client-id': 'test-client-id',
+                'image-builder-client-secret': 'test-client-secret'
             }
             mock_client.make_request.return_value = mock_api_response
             mcp_server.clients['test-client-id'] = mock_client
@@ -276,8 +276,8 @@ class TestGetBlueprints:
         """Test handling of 'null' string as search parameter."""
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
             mock_headers.return_value = {
-                'x-client-id': 'test-client-id',
-                'x-client-secret': 'test-client-secret'
+                'image-builder-client-id': 'test-client-id',
+                'image-builder-client-secret': 'test-client-secret'
             }
             mock_client.make_request.return_value = mock_api_response
             mcp_server.clients['test-client-id'] = mock_client
@@ -333,6 +333,6 @@ class TestGetBlueprints:
             # Check for relevant parts of the no_auth_error message for SSE transport
             assert "Tell the user" in result
             assert "header variables" in result
-            assert "x-client-ID" in result
-            assert "x-client-secret" in result
+            assert "image-builder-client-id" in result
+            assert "image-builder-client-secret" in result
             assert "Error: Client ID and secret are required to access the Image Builder API" in result 
