@@ -1,3 +1,6 @@
+build-prod: ## Build the container image but with the upstream tag
+	podman build --tag ghcr.io/osbuild/image-builder-mcp:latest .
+
 build: ## Build the container image
 	podman build --tag image-builder-mcp .
 
