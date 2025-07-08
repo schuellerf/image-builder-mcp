@@ -214,7 +214,7 @@ class ImageBuilderMCP(FastMCP):
                 image_type: str = "guest-image",
                 image_name: Optional[str] = None,
                 image_description: Optional[str] = None) -> str:
-        """Create a new operating system image. Assure that the data is according to ComposeRequest descriped in openapi.
+        """Create a new, up to date, operating system image. Assure that the data is according to ComposeRequest descriped in openapi.
         Ask user for more details to be able to fill "data" properly before calling this.
 
         Args:
@@ -324,7 +324,7 @@ class ImageBuilderMCP(FastMCP):
             return f"Error: {str(e)}"
 
     def create_blueprint(self, data: dict) -> str:
-        """Start with this tool if a user wants to create a customized linux image.
+        """Start with this tool if a user wants to create an up to date, or customized linux image.
         Assure that the data is according to CreateBlueprintRequest described in openapi.
         Always ask the user for more details to be able to fill "data" properly before calling this.
         Never come up with the data yourself.
