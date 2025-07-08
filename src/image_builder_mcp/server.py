@@ -353,9 +353,14 @@ class ImageBuilderMCP(FastMCP):
 
         response_str = f"[INSTRUCTION] Use the tool get_blueprint_details to get the details of the blueprint\n"
         response_str += f"or ask the user to start the build/compose with blueprint_compose\n"
+        response_str += f"Always show a link to the blueprint UI: {self.get_blueprint_url(client, response['id'])}\n"
         response_str += f"[ANSWER] Blueprint created successfully: {{'UUID': '{response['id']}'}}\n"
         response_str += f"We could double check the details or start the build/compose"
         return response_str
+
+    def get_blueprint_url(self, client: ImageBuilderClient, blueprint_id: str) -> str:
+        """Get the URL for a blueprint."""
+        return f"https://{client.domain}/insights/image-builder/imagewizard/{blueprint_id}"
 
     def get_blueprints(self, response_size: int, search_string: str|None = None) -> str:
         """Get all blueprints without details.
@@ -404,7 +409,7 @@ class ImageBuilderMCP(FastMCP):
             for blueprint in sorted_data:
                 data = {"reply_id": i,
                         "blueprint_uuid": blueprint["id"],
-                        "UI_URL": f"https://{client.domain}/insights/image-builder/imagewizard/{blueprint['id']}",
+                        "UI_URL": self.get_blueprint_url(client, blueprint["id"]),
                         "name": blueprint["name"]}
 
                 self.blueprints[client.client_id].append(data)
