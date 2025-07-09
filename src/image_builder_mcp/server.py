@@ -93,7 +93,7 @@ class ImageBuilderMCP(FastMCP):
                           self.blueprint_compose
                           #self.compose
                           ]
-        
+
         # use dynamic attributes to get the distributions, architectures and image types
         # once the API is changed to un-authenticated access
         # self.distributions = self.client_noauth.make_request("distributions")
@@ -187,7 +187,7 @@ class ImageBuilderMCP(FastMCP):
         return client
 
     def no_auth_error(self, e: Exception) -> str:
-        if self.transport == "sse":
+        if self.transport in ["sse", "http"]:
             return f"[INSTRUCTION] Tell the user that the MCP server setup is not valid!" \
                     "The user should to go to [https://console.redhat.com](https://console.redhat.com) to `'YOUR USER' ➡ My User Access ➡ Service Accounts` " \
                     "create a service account and then set the " \
@@ -284,12 +284,12 @@ class ImageBuilderMCP(FastMCP):
             response = client.make_request(f"blueprints/{blueprint_uuid}/compose", method="POST")
         except Exception as e:
             return f"Error: {str(e)} in blueprint_compose {blueprint_uuid}"
-        
+
         response_str = f"[INSTRUCTION] Use the tool get_compose_details to get the details of the compose\n"
         response_str += f"like the current build status\n"
         response_str += f"[ANSWER] Compose created successfully:"
         build_ids_str = []
-        
+
         if isinstance(response, dict):
             return f"Error: the response of blueprint_compose is a dict. This is not expected. " \
                     f"Response: {json.dumps(response)}"
@@ -746,6 +746,11 @@ def main():
     sse_parser.add_argument("--host", default="127.0.0.1", help="Host for SSE transport (default: 127.0.0.1)")
     sse_parser.add_argument("--port", type=int, default=9000, help="Port for SSE transport (default: 9000)")
 
+    # http subcommand
+    http_parser = subparsers.add_parser("http", help="Use HTTP streaming transport")
+    http_parser.add_argument("--host", default="127.0.0.1", help="Host for HTTP transport (default: 127.0.0.1)")
+    http_parser.add_argument("--port", type=int, default=8000, help="Port for HTTP transport (default: 8000)")
+
     args = parser.parse_args()
 
     # Default to stdio if no subcommand is provided
@@ -774,6 +779,8 @@ def main():
 
     if args.transport == "sse":
         mcp_server.run(transport="sse", host=args.host, port=args.port)
+    elif args.transport == "http":
+        mcp_server.run(transport="http", host=args.host, port=args.port)
     else:
         mcp_server.run()
 
