@@ -317,7 +317,7 @@ class TestGetBlueprints:
             assert "IMAGE_BUILDER_CLIENT_ID" in result
             assert "IMAGE_BUILDER_CLIENT_SECRET" in result
             assert "mcp.json config" in result
-            assert "Error: Client ID and secret are required to access the Image Builder API" in result
+            assert "Error: Client ID is required to access the Image Builder API" in result
 
     def test_get_blueprints_no_auth_error_message_sse_transport(self):
         """Test that get_blueprints returns the no_auth_error() message for SSE transport.
@@ -342,7 +342,7 @@ class TestGetBlueprints:
             assert "header variables" in result
             assert "image-builder-client-id" in result
             assert "image-builder-client-secret" in result
-            assert "Error: Client ID and secret are required to access the Image Builder API" in result
+            assert "Error: Client ID is required to access the Image Builder API" in result
 
     def test_get_blueprints_no_auth_error_message_http_transport(self):
         """Test that get_blueprints returns the no_auth_error() message for HTTP transport.
@@ -367,4 +367,4 @@ class TestGetBlueprints:
             assert "header variables" in result
             assert "image-builder-client-id" in result
             assert "image-builder-client-secret" in result
-            assert "Error: Client ID and secret are required to access the Image Builder API" in result
+            assert "Error: Client ID is required to access the Image Builder API" in result

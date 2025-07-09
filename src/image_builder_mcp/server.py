@@ -6,12 +6,16 @@ import logging
 import os
 import sys
 from datetime import datetime
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
 from fastmcp.tools.tool import Tool
 from mcp.types import ToolAnnotations
+import uvicorn
+import jwt
+
+from .oauth import Middleware
 
 from .client import ImageBuilderClient
 
@@ -30,7 +34,8 @@ class ImageBuilderMCP(FastMCP):  # pylint: disable=too-many-instance-attributes
             default_response_size: int = 10,
             stage: Optional[bool] = False,
             proxy_url: Optional[str] = None,
-            transport: Optional[str] = None):
+            transport: Optional[str] = None,
+            oauth_enabled: bool = False):
         self.stage = stage
         self.proxy_url = proxy_url
         self.transport = transport
@@ -39,6 +44,7 @@ class ImageBuilderMCP(FastMCP):  # pylint: disable=too-many-instance-attributes
         # probably we want to destiguish a hosted MCP server from
         # a local one (deployed by a customer)
         self.image_builder_mcp_client_id = "mcp"
+        self.oauth_enabled = oauth_enabled
         if stage:
             api_type = "stage"
         else:
@@ -60,7 +66,8 @@ class ImageBuilderMCP(FastMCP):  # pylint: disable=too-many-instance-attributes
             client_secret=None,
             stage=self.stage,
             proxy_url=self.proxy_url,
-            image_builder_mcp_client_id=self.image_builder_mcp_client_id
+            image_builder_mcp_client_id=self.image_builder_mcp_client_id,
+            oauth_enabled=self.oauth_enabled
         )
 
         # cache the client for all users
@@ -80,7 +87,8 @@ class ImageBuilderMCP(FastMCP):  # pylint: disable=too-many-instance-attributes
                 client_secret,
                 stage=self.stage,
                 proxy_url=self.proxy_url,
-                image_builder_mcp_client_id=self.image_builder_mcp_client_id
+                image_builder_mcp_client_id=self.image_builder_mcp_client_id,
+                oauth_enabled=self.oauth_enabled
             )
             self.client_id = client_id
             self.client_secret = client_secret
@@ -172,27 +180,51 @@ class ImageBuilderMCP(FastMCP):  # pylint: disable=too-many-instance-attributes
             tool.title = description_str.split("\n", 1)[0]
             self.add_tool(tool)
 
-    def get_client_id_and_secret(self, headers: Dict[str, str]) -> Tuple[str, str]:
-        """Get the client ID and secret preferably from the headers."""
-        client_id = headers.get("image-builder-client-id") or self.client_id
-        client_secret = headers.get("image-builder-client-secret") or self.client_secret
-        self.logger.debug("get_client_id_and_secret request headers: %s", headers)
+    def get_client_id(self, headers: Dict[str, str]) -> str:
+        """Get the client ID preferably from the headers."""
+        client_id = ""
+        if self.oauth_enabled:
+            caller_headers_auth = headers.get("authorization")
+            if caller_headers_auth and caller_headers_auth.startswith("Bearer "):
+                # decode bearer token to get sid and use as client_id
+                token = caller_headers_auth.split("Bearer ", 1)[-1]
+                client_id = jwt.decode(
+                    token, options={"verify_signature": False}).get("sid")
+                self.logger.debug(
+                    "Using sid from Bearer token as client_id: %s", client_id)
+        else:
+            client_id = headers.get("image-builder-client-id") or self.client_id or ""
+            self.logger.debug("get_client_id request headers: %s", headers)
 
-        if not client_id or not client_secret:
-            raise ValueError("Client ID and secret are required to access the Image Builder API")
-        return client_id, client_secret
+        # explicit check for mypy
+        if not client_id:
+            raise ValueError("Client ID is required to access the Image Builder API")
+        return client_id
+
+    def get_client_secret(self, headers: Dict[str, str]) -> str:
+        """Get the client secret preferably from the headers."""
+        client_secret = headers.get("image-builder-client-secret") or self.client_secret
+        self.logger.debug("get_client_secret request headers: %s", headers)
+
+        if not client_secret:
+            raise ValueError("Client secret is required to access the Image Builder API")
+        return client_secret
 
     def get_client(self, headers: Dict[str, str]) -> ImageBuilderClient:
         """Get the ImageBuilderClient instance for the current user."""
-        client_id, client_secret = self.get_client_id_and_secret(headers)
+        client_id = self.get_client_id(headers)
         client = self.clients.get(client_id)
         if not client:
+            client_secret = None
+            if not self.oauth_enabled:
+                client_secret = self.get_client_secret(headers)
             client = ImageBuilderClient(
                 client_id,
                 client_secret,
                 stage=self.stage,
                 proxy_url=self.proxy_url,
-                image_builder_mcp_client_id=self.image_builder_mcp_client_id)
+                image_builder_mcp_client_id=self.image_builder_mcp_client_id,
+                oauth_enabled=self.oauth_enabled)
             self.clients[client_id] = client
         return client
 
@@ -484,13 +516,10 @@ class ImageBuilderMCP(FastMCP):  # pylint: disable=too-many-instance-attributes
             response_size = self.default_response_size
         try:
             try:
-                client_id, _ = self.get_client_id_and_secret(
-                    get_http_headers())
+                client_id = self.get_client_id(get_http_headers())
             except ValueError as e:
                 return self.no_auth_error(e)
 
-            # At this point, client_id is guaranteed to be a string
-            client_id = str(client_id)  # Explicit type annotation for mypy
             if not self.blueprints[client_id]:
                 self.get_blueprints(response_size, search_string)
 
@@ -543,8 +572,7 @@ class ImageBuilderMCP(FastMCP):  # pylint: disable=too-many-instance-attributes
                 return self.no_auth_error(e)
 
             try:
-                client_id, _ = self.get_client_id_and_secret(
-                    get_http_headers())
+                client_id = self.get_client_id(get_http_headers())
             except ValueError as e:
                 return self.no_auth_error(e)
 
@@ -694,8 +722,7 @@ class ImageBuilderMCP(FastMCP):  # pylint: disable=too-many-instance-attributes
             response_size = self.default_response_size
         try:
             try:
-                client_id, _ = self.get_client_id_and_secret(
-                    get_http_headers())
+                client_id = self.get_client_id(get_http_headers())
             except ValueError as e:
                 return self.no_auth_error(e)
 
@@ -756,8 +783,7 @@ class ImageBuilderMCP(FastMCP):  # pylint: disable=too-many-instance-attributes
                 return self.no_auth_error(e)
 
             try:
-                client_id, _ = self.get_client_id_and_secret(
-                    get_http_headers())
+                client_id = self.get_client_id(get_http_headers())
             except ValueError as e:
                 return self.no_auth_error(e)
 
@@ -872,16 +898,50 @@ def main():
     if args.debug:
         logging.getLogger("ImageBuilderMCP").setLevel(logging.DEBUG)
         logging.getLogger("ImageBuilderClient").setLevel(logging.DEBUG)
+        logging.getLogger("ImageBuilderOAuthMiddleware").setLevel(logging.DEBUG)
         logging.info("Debug mode enabled")
+
+    oauth_enabled = bool(os.getenv("OAUTH_ENABLED", "false"))
 
     # Create and run the MCP server
     mcp_server = ImageBuilderMCP(
-        client_id, client_secret, stage=args.stage, proxy_url=proxy_url, transport=args.transport)
+        client_id,
+        client_secret,
+        stage=args.stage,
+        proxy_url=proxy_url,
+        transport=args.transport,
+        oauth_enabled=oauth_enabled,
+    )
 
     if args.transport == "sse":
         mcp_server.run(transport="sse", host=args.host, port=args.port)
     elif args.transport == "http":
-        mcp_server.run(transport="http", host=args.host, port=args.port)
+        if oauth_enabled:
+            app = mcp_server.http_app(transport="http")
+            self_url = os.getenv(
+                "SELF_URL",
+                f"http://{args.host}:{args.port}",
+            )
+            oauth_url = os.getenv(
+                "OAUTH_URL",
+                "https://sso.redhat.com/auth/realms/redhat-external",
+            )
+            oauth_client = os.getenv("OAUTH_CLIENT")
+            if not oauth_client:
+                logging.fatal("OAUTH_CLIENT environment variable is required for OAuth-enabled HTTP transport")
+                sys.exit(1)
+
+            app.add_middleware(
+                Middleware,
+                self_url=self_url,
+                oauth_url=oauth_url,
+                oauth_client=oauth_client,
+            )
+
+            # Start the application
+            uvicorn.run(app, host=args.host, port=args.port)
+        else:
+            mcp_server.run(transport="http", host=args.host, port=args.port)
     else:
         mcp_server.run()
 

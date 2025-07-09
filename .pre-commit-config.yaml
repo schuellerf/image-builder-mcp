@@ -23,7 +23,7 @@ repos:
     rev: 'v1.11.1'
     hooks:
       - id: mypy
-        additional_dependencies: ["PyYAML", "types-PyYAML", "types-requests", "fastmcp", "requests"]
+        additional_dependencies: ["PyYAML", "types-PyYAML", "types-requests", "fastmcp", "requests", "PyJWT"]
   - repo: https://github.com/hhatto/autopep8
     rev: v2.3.0
     hooks:
@@ -32,4 +32,4 @@ repos:
     rev: v3.2.6
     hooks:
       - id: pylint
-        additional_dependencies: ["PyYAML", "types-PyYAML", "types-requests", "pytest", "fastmcp", "requests"]
+        additional_dependencies: ["PyYAML", "types-PyYAML", "types-requests", "pytest", "fastmcp", "requests", "PyJWT"]
