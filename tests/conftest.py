@@ -3,10 +3,6 @@ Pytest configuration and shared fixtures for image-builder-mcp tests.
 """
 
 import pytest
-from unittest.mock import Mock
-
-# Clean import - no sys.path.insert needed with proper package structure!
-from image_builder_mcp import ImageBuilderMCP, ImageBuilderClient
 
 
 @pytest.fixture
@@ -25,9 +21,9 @@ def test_client_credentials():
 
 
 @pytest.fixture
-def mock_http_headers(test_client_credentials):
+def mock_http_headers(client_creds):
     """Mock HTTP headers with test credentials."""
     return {
-        'image-builder-client-id': test_client_credentials['client_id'],
-        'image-builder-client-secret': test_client_credentials['client_secret']
-    } 
+        'image-builder-client-id': client_creds['client_id'],
+        'image-builder-client-secret': client_creds['client_secret']
+    }

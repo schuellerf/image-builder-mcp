@@ -30,7 +30,7 @@ or using the CLI entry point:
 image-builder-mcp sse
 ```
 
-This will start image-builder-mcp server at http://localhost:9000/sse
+This will start `image-builder-mcp` server at http://localhost:9000/sse
 
 For HTTP streaming transport:
 
@@ -41,10 +41,10 @@ python -m image_builder_mcp http
 or using the CLI entry point:
 
 ```
-image-builder-mcp http
+`image-builder-mcp` http
 ```
 
-This will start image-builder-mcp server with HTTP streaming transport at http://localhost:8000
+This will start `image-builder-mcp` server with HTTP streaming transport at http://localhost:8000
 
 ### Using Podman/Docker
 

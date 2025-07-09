@@ -1,10 +1,12 @@
+"""Image Builder MCP server for creating and managing Linux images."""
+
 import argparse
 import json
 import logging
 import os
 import sys
 from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
@@ -14,8 +16,14 @@ from mcp.types import ToolAnnotations
 from .client import ImageBuilderClient
 
 
-class ImageBuilderMCP(FastMCP):
-    def __init__(
+class ImageBuilderMCP(FastMCP):  # pylint: disable=too-many-instance-attributes
+    """MCP server for Red Hat Image Builder integration.
+
+    This server provides tools for creating, managing, and building
+    custom Linux images using the Red Hat Image Builder service.
+    """
+
+    def __init__(  # pylint: disable=too-many-arguments
             self,
             client_id: Optional[str],
             client_secret: Optional[str],
@@ -43,8 +51,8 @@ class ImageBuilderMCP(FastMCP):
         Use this to create custom Redhat enterprise, Centos or Fedora Linux disk images."""
 
         super().__init__(
-            name = "Image Builder MCP Server",
-            instructions= general_intro
+            name="Image Builder MCP Server",
+            instructions=general_intro
         )
         # could be used once we have e.g. "/distributions" available without authentication
         self.client_noauth = ImageBuilderClient(
@@ -61,10 +69,10 @@ class ImageBuilderMCP(FastMCP):
         self.client_id = None
         self.client_secret = None
 
-        self.blueprints = {}
-        self.composes = {}
-        self.blueprint_current_index = {}
-        self.compose_current_index = {}
+        self.blueprints: Dict[str, list] = {}
+        self.composes: Dict[str, list] = {}
+        self.blueprint_current_index: Dict[str, int] = {}
+        self.compose_current_index: Dict[str, int] = {}
 
         if client_id and client_secret:
             self.clients[client_id] = ImageBuilderClient(
@@ -80,6 +88,7 @@ class ImageBuilderMCP(FastMCP):
         self.register_tools()
 
     def register_tools(self):
+        """Register all available tools with the MCP server."""
         # prepend generic keywords for use of many other tools
         # and register with "self.tool()"
         tool_functions = [self.get_openapi,
@@ -91,7 +100,7 @@ class ImageBuilderMCP(FastMCP):
                           self.get_more_composes,
                           self.get_compose_details,
                           self.blueprint_compose
-                          #self.compose
+                          # self.compose
                           ]
 
         # use dynamic attributes to get the distributions, architectures and image types
@@ -154,19 +163,20 @@ class ImageBuilderMCP(FastMCP):
                 openWorldHint=True
             )
             description_str = f.__doc__.format(
-                distributions=", ".join([d['name'] for d in self.distributions]),
+                distributions=", ".join([d['name']
+                                        for d in self.distributions]),
                 architectures=", ".join(self.architectures),
                 image_types=", ".join(self.image_types)
             )
             tool.description = description_str
-            tool.title = description_str.split("\n")[0]
+            tool.title = description_str.split("\n", 1)[0]
             self.add_tool(tool)
 
     def get_client_id_and_secret(self, headers: Dict[str, str]) -> Tuple[str, str]:
         """Get the client ID and secret preferably from the headers."""
         client_id = headers.get("image-builder-client-id") or self.client_id
         client_secret = headers.get("image-builder-client-secret") or self.client_secret
-        self.logger.debug(f"get_client_id_and_secret request headers: {headers}")
+        self.logger.debug("get_client_id_and_secret request headers: %s", headers)
 
         if not client_id or not client_secret:
             raise ValueError("Client ID and secret are required to access the Image Builder API")
@@ -187,34 +197,42 @@ class ImageBuilderMCP(FastMCP):
         return client
 
     def no_auth_error(self, e: Exception) -> str:
-        if self.transport in ["sse", "http"]:
-            return f"[INSTRUCTION] Tell the user that the MCP server setup is not valid!" \
-                    "The user should to go to [https://console.redhat.com](https://console.redhat.com) to `'YOUR USER' ➡ My User Access ➡ Service Accounts` " \
-                    "create a service account and then set the " \
-                    "header variables `image-builder-client-id` and `image-builder-client-secret` in your request.\n" \
-                    "Here is the direct link for the user's convenience: [https://console.redhat.com/iam/service-accounts](https://console.redhat.com/iam/service-accounts) " \
-                    "Come up with a detailed description of this for the user. " \
-                    "Only describe this, don't expose details about the tool function itself." \
-                    "Don't proceed with the request before this is fixed." \
-                    f"Error: {str(e)}."
-        else:
-            return f"[INSTRUCTION] Tell the user that the MCP server setup is not valid!" \
-                    "The user should to go to [https://console.redhat.com](https://console.redhat.com) to `'YOUR USER' ➡ My User Access ➡ Service Accounts` " \
-                    "create a service account and then set the " \
-                    "`IMAGE_BUILDER_CLIENT_ID` and `IMAGE_BUILDER_CLIENT_SECRET` in your mcp.json config.\n" \
-                    "Here is the direct link for the user's convenience: [https://console.redhat.com/iam/service-accounts](https://console.redhat.com/iam/service-accounts) " \
-                    "Come up with a detailed description of this for the user. " \
-                    "Only describe this, don't expose details about the tool function itself." \
-                    "Don't proceed with the request before this is fixed." \
-                    f"Error: {str(e)}."
+        """Generate authentication error message based on transport type."""
+        base_message = (
+            "[INSTRUCTION] Tell the user that the MCP server setup is not valid! "
+            "The user should go to [https://console.redhat.com](https://console.redhat.com) to "
+            "'YOUR USER' ➡ My User Access ➡ Service Accounts create a service account and then set the "
+        )
 
-    def compose(self,
+        if self.transport in ["sse", "http"]:
+            return (
+                f"{base_message}header variables `image-builder-client-id` and "
+                "`image-builder-client-secret` in your request.\n"
+                "Here is the direct link for the user's convenience: "
+                "[https://console.redhat.com/iam/service-accounts](https://console.redhat.com/iam/service-accounts) "
+                "Come up with a detailed description of this for the user. "
+                "Only describe this, don't expose details about the tool function itself. "
+                f"Don't proceed with the request before this is fixed. Error: {str(e)}."
+            )
+
+        return (
+            f"{base_message}`IMAGE_BUILDER_CLIENT_ID` and `IMAGE_BUILDER_CLIENT_SECRET` "
+            "in your mcp.json config.\n"
+            "Here is the direct link for the user's convenience: "
+            "[https://console.redhat.com/iam/service-accounts](https://console.redhat.com/iam/service-accounts) "
+            "Come up with a detailed description of this for the user. "
+            "Only describe this, don't expose details about the tool function itself. "
+            f"Don't proceed with the request before this is fixed. Error: {str(e)}."
+        )
+
+    def compose(self,  # pylint: disable=too-many-arguments
                 distribution: str,
                 architecture: str = "x86_64",
                 image_type: str = "guest-image",
                 image_name: Optional[str] = None,
                 image_description: Optional[str] = None) -> str:
-        """Create a new, up to date, operating system image. Assure that the data is according to ComposeRequest descriped in openapi.
+        """Create a new, up to date, operating system image.
+        Assure that the data is according to ComposeRequest descriped in openapi.
         Ask user for more details to be able to fill "data" properly before calling this.
 
         Args:
@@ -242,25 +260,29 @@ class ImageBuilderMCP(FastMCP):
                     }
                 }
             ]
-            #"customizations": {…}
+            # "customizations": {…}
         }
         if image_name:
             data["image_name"] = image_name
         else:
             # Generate a default image name based on distribution and architecture
-            data["image_name"] = f"{distribution}-{architecture}-{image_type}-{datetime.now().strftime('%Y%m%d%H%M%S')}-mcp"
+            name = f"{distribution}-{architecture}-{image_type}-"
+            name += f"{datetime.now().strftime('%Y%m%d%H%M%S')}-mcp"
+            data["image_name"] = name
         if image_description:
             data["image_description"] = image_description
         else:
             # Generate a default image description
-            data["image_description"] = f"Image created via image-builder-mcp on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            description = "Image created via image-builder-mcp on"
+            description += f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            data["image_description"] = description
         try:
             # TBD: programmatically check against openapi
             response = client.make_request("compose", method="POST", data=data)
             return f"Compose created successfully: {json.dumps(response)}"
-        except Exception as e:
+        # avoid crashing the server so we'll stick to the broad exception catch
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error: {str(e)} for compose {json.dumps(data)}"
-
 
     def blueprint_compose(self, blueprint_uuid: str) -> str:
         """Compose an image from a blueprint UUID created with create_blueprint, get_blueprints.
@@ -281,18 +303,20 @@ class ImageBuilderMCP(FastMCP):
             return self.no_auth_error(e)
 
         try:
-            response = client.make_request(f"blueprints/{blueprint_uuid}/compose", method="POST")
-        except Exception as e:
+            response = client.make_request(
+                f"blueprints/{blueprint_uuid}/compose", method="POST")
+        # avoid crashing the server so we'll stick to the broad exception catch
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error: {str(e)} in blueprint_compose {blueprint_uuid}"
 
-        response_str = f"[INSTRUCTION] Use the tool get_compose_details to get the details of the compose\n"
-        response_str += f"like the current build status\n"
-        response_str += f"[ANSWER] Compose created successfully:"
+        response_str = "[INSTRUCTION] Use the tool get_compose_details to get the details of the compose\n"
+        response_str += "like the current build status\n"
+        response_str += "[ANSWER] Compose created successfully:"
         build_ids_str = []
 
         if isinstance(response, dict):
             return f"Error: the response of blueprint_compose is a dict. This is not expected. " \
-                    f"Response: {json.dumps(response)}"
+                f"Response: {json.dumps(response)}"
 
         for build in response:
             if isinstance(build, dict) and 'id' in build:
@@ -301,7 +325,7 @@ class ImageBuilderMCP(FastMCP):
                 build_ids_str.append(f"Invalid build object: {build}")
 
         response_str += f"\n{json.dumps(build_ids_str)}"
-        response_str += f"\nWe could double check the details or start the build/compose"
+        response_str += "\nWe could double check the details or start the build/compose"
         return response_str
 
     def get_openapi(self, response_size: int) -> str:
@@ -317,10 +341,12 @@ class ImageBuilderMCP(FastMCP):
             Exception: If the image-builder connection fails.
         """
         # response_size is just a dummy parameter for langflow
+        _ = response_size  # Unused parameter, required by interface
         try:
             response = self.client_noauth.make_request("openapi.json")
             return json.dumps(response)
-        except Exception as e:
+        # avoid crashing the server so we'll stick to the broad exception catch
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error: {str(e)}"
 
     def create_blueprint(self, data: dict) -> str:
@@ -343,26 +369,28 @@ class ImageBuilderMCP(FastMCP):
             return self.no_auth_error(e)
         try:
             # TBD: programmatically check against openapi
-            response = client.make_request("blueprints", method="POST", data=data)
-        except Exception as e:
+            response = client.make_request(
+                "blueprints", method="POST", data=data)
+        # avoid crashing the server so we'll stick to the broad exception catch
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error: {str(e)}"
 
         if isinstance(response, list):
             return "Error: the response of blueprint creation is a list. This is not expected. " \
-                    f"Response: {json.dumps(response)}"
+                f"Response: {json.dumps(response)}"
 
-        response_str = f"[INSTRUCTION] Use the tool get_blueprint_details to get the details of the blueprint\n"
-        response_str += f"or ask the user to start the build/compose with blueprint_compose\n"
+        response_str = "[INSTRUCTION] Use the tool get_blueprint_details to get the details of the blueprint\n"
+        response_str += "or ask the user to start the build/compose with blueprint_compose\n"
         response_str += f"Always show a link to the blueprint UI: {self.get_blueprint_url(client, response['id'])}\n"
         response_str += f"[ANSWER] Blueprint created successfully: {{'UUID': '{response['id']}'}}\n"
-        response_str += f"We could double check the details or start the build/compose"
+        response_str += "We could double check the details or start the build/compose"
         return response_str
 
     def get_blueprint_url(self, client: ImageBuilderClient, blueprint_id: str) -> str:
         """Get the URL for a blueprint."""
         return f"https://{client.domain}/insights/image-builder/imagewizard/{blueprint_id}"
 
-    def get_blueprints(self, response_size: int, search_string: str|None = None) -> str:
+    def get_blueprints(self, response_size: int, search_string: str | None = None) -> str:
         """Get all blueprints without details.
         For "all" set "response_size" to None
         This starts a fresh search.
@@ -384,6 +412,9 @@ class ImageBuilderMCP(FastMCP):
         except ValueError as e:
             return self.no_auth_error(e)
 
+        # Extract client_id for dictionary indexing
+        client_id = str(client.client_id)  # Explicit type annotation for mypy
+
         # workaround seen in LLama 3.3 70B Instruct
         if search_string == "null":
             search_string = None
@@ -396,23 +427,23 @@ class ImageBuilderMCP(FastMCP):
 
             if isinstance(response, list):
                 return "Error: the response of get_blueprints is a list. This is not expected. " \
-                        f"Response: {json.dumps(response)}"
+                    f"Response: {json.dumps(response)}"
 
             # Sort data by created_at
             sorted_data = sorted(response["data"],
-                               key=lambda x: x.get("last_modified_at", ""),
-                               reverse=True)
+                                 key=lambda x: x.get("last_modified_at", ""),
+                                 reverse=True)
 
-            ret = []
+            ret: list[dict] = []
             i = 1
-            self.blueprints[client.client_id] = []
+            self.blueprints[client_id] = []
             for blueprint in sorted_data:
                 data = {"reply_id": i,
                         "blueprint_uuid": blueprint["id"],
                         "UI_URL": self.get_blueprint_url(client, blueprint["id"]),
                         "name": blueprint["name"]}
 
-                self.blueprints[client.client_id].append(data)
+                self.blueprints[client_id].append(data)
 
                 if len(ret) < response_size:
                     if search_string:
@@ -422,19 +453,20 @@ class ImageBuilderMCP(FastMCP):
                         ret.append(data)
 
                 i += 1
-            self.blueprint_current_index[client.client_id] = min(i, response_size+1)
+            self.blueprint_current_index[client_id] = min(
+                i, response_size+1)
             intro = "[INSTRUCTION] Use the UI_URL to link to the blueprint\n"
-            intro += f"[ANSWER]\n"
-            if len(self.blueprints[client.client_id]) > len(ret):
-                intro += f"Only {len(ret)} out of {len(self.blueprints[client.client_id])} returned. Ask for more if needed:"
+            intro += "[ANSWER]\n"
+            if len(self.blueprints[client_id]) > len(ret):
+                intro += f"Only {len(ret)} out of {len(self.blueprints[client_id])} returned. Ask for more if needed:"
             else:
                 intro += f"All {len(ret)} entries. There are no more."
             return f"{intro}\n{json.dumps(ret)}"
-        except Exception as e:
+        # avoid crashing the server so we'll stick to the broad exception catch
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error: {str(e)}"
 
-
-    def get_more_blueprints(self, response_size: int, search_string: str|None = None) -> str:
+    def get_more_blueprints(self, response_size: int, search_string: str | None = None) -> str:
         """Get more blueprints without details.
 
         Args:
@@ -451,7 +483,14 @@ class ImageBuilderMCP(FastMCP):
         if response_size <= 0:
             response_size = self.default_response_size
         try:
-            client_id, _ = self.get_client_id_and_secret(get_http_headers())
+            try:
+                client_id, _ = self.get_client_id_and_secret(
+                    get_http_headers())
+            except ValueError as e:
+                return self.no_auth_error(e)
+
+            # At this point, client_id is guaranteed to be a string
+            client_id = str(client_id)  # Explicit type annotation for mypy
             if not self.blueprints[client_id]:
                 self.get_blueprints(response_size, search_string)
 
@@ -459,7 +498,7 @@ class ImageBuilderMCP(FastMCP):
                 return "There are no more blueprints. Should I start a fresh search with get_blueprints?"
 
             i = 1
-            ret = []
+            ret: list[dict] = []
             for blueprint in self.blueprints[client_id]:
                 i += 1
                 if i > self.blueprint_current_index[client_id] and len(ret) < response_size:
@@ -469,7 +508,8 @@ class ImageBuilderMCP(FastMCP):
                     else:
                         ret.append(blueprint)
 
-            self.blueprint_current_index[client_id] = min(self.blueprint_current_index[client_id] + len(ret), len(self.blueprints[client_id]))
+            self.blueprint_current_index[client_id] = min(
+                self.blueprint_current_index[client_id] + len(ret), len(self.blueprints[client_id]))
 
             intro = ""
             if len(self.blueprints[client_id]) > len(ret):
@@ -477,7 +517,8 @@ class ImageBuilderMCP(FastMCP):
             else:
                 intro = f"All {len(ret)} entries. There are no more."
             return f"{intro}\n{json.dumps(ret)}"
-        except Exception as e:
+        # avoid crashing the server so we'll stick to the broad exception catch
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error: {str(e)}"
 
     def get_blueprint_details(self, blueprint_identifier: str) -> str:
@@ -501,7 +542,14 @@ class ImageBuilderMCP(FastMCP):
             except ValueError as e:
                 return self.no_auth_error(e)
 
-            client_id, _ = self.get_client_id_and_secret(get_http_headers())
+            try:
+                client_id, _ = self.get_client_id_and_secret(
+                    get_http_headers())
+            except ValueError as e:
+                return self.no_auth_error(e)
+
+            # At this point, client_id is guaranteed to be a string
+            client_id = str(client_id)  # Explicit type annotation for mypy
             if not self.blueprints[client_id]:
                 # get one blueprint as this just updates the index
                 self.get_blueprints(1)
@@ -509,17 +557,23 @@ class ImageBuilderMCP(FastMCP):
             # Find matching blueprints using filter
             matching_blueprints = list(filter(
                 lambda b: (b["name"] == blueprint_identifier or
-                          b["blueprint_uuid"] == blueprint_identifier or
-                          str(b["reply_id"]) == blueprint_identifier),
+                           b["blueprint_uuid"] == blueprint_identifier or
+                           str(b["reply_id"]) == blueprint_identifier),
                 self.blueprints[client_id]
             ))
 
             # Get details for each matching blueprint
-            ret = []
+            ret: list[dict] = []
             for blueprint in matching_blueprints:
-                response = client.make_request(f"blueprints/{blueprint['blueprint_uuid']}")
+                response = client.make_request(
+                    f"blueprints/{blueprint['blueprint_uuid']}")
                 # TBD filter irrelevant attributes
-                ret.append(response)
+                if isinstance(response, dict):
+                    ret.append(response)
+                else:
+                    # Handle unexpected list response
+                    ret.append(
+                        {"error": "Unexpected list response", "data": response})
 
             # Prepare response message
             intro = ""
@@ -529,11 +583,34 @@ class ImageBuilderMCP(FastMCP):
                 intro = f"Found {len(ret)} blueprints for '{blueprint_identifier}'.\n"
 
             return f"{intro}{json.dumps(ret)}"
-        except Exception as e:
+        # avoid crashing the server so we'll stick to the broad exception catch
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error: {str(e)}"
 
+    def _create_compose_data(self, compose: dict, reply_id: int, client: ImageBuilderClient) -> dict:
+        """Create compose data dictionary with blueprint URL."""
+        data = {
+            "reply_id": reply_id,
+            "compose_uuid": compose["id"],
+            "blueprint_id": compose.get("blueprint_id", "N/A"),
+            "image_name": compose.get("image_name", "")
+        }
 
-    def get_composes(self, response_size: int, search_string: str|None = None) -> str:
+        if compose.get("blueprint_id"):
+            data["blueprint_url"] = (f"https://{client.domain}/insights/image-builder/"
+                                     f"imagewizard/{compose['blueprint_id']}")
+        else:
+            data["blueprint_url"] = "N/A"
+
+        return data
+
+    def _should_include_compose(self, data: dict, search_string: str | None) -> bool:
+        """Determine if compose should be included based on search criteria."""
+        if not search_string:
+            return True
+        return search_string.lower() in data["image_name"].lower()
+
+    def get_composes(self, response_size: int, search_string: str | None = None) -> str:
         """Get all composes without details.
         Use this to get the latest image builds.
         For "all" set "response_size" to None
@@ -554,56 +631,52 @@ class ImageBuilderMCP(FastMCP):
         if response_size <= 0:
             response_size = self.default_response_size
         try:
-            try:
-                client = self.get_client(get_http_headers())
-            except ValueError as e:
-                return self.no_auth_error(e)
+            client = self.get_client(get_http_headers())
+
+            # Extract client_id for dictionary indexing
+            # Explicit type annotation for mypy
+            client_id = str(client.client_id)
 
             response = client.make_request("composes")
 
             if isinstance(response, list):
-                return "Error: the response of get_composes is a list. This is not expected. " \
-                        f"Response: {json.dumps(response)}"
+                return (f"Error: the response of get_composes is a list. This is not expected. "
+                        f"Response: {json.dumps(response)}")
 
             # Sort data by created_at
             sorted_data = sorted(response["data"],
-                               key=lambda x: x.get("created_at", ""),
-                               reverse=True)
+                                 key=lambda x: x.get("created_at", ""),
+                                 reverse=True)
 
-            ret = []
-            i = 1
-            self.composes[client.client_id] = []
-            for compose in sorted_data:
-                data = {"reply_id": i,
-                        "compose_uuid": compose["id"],
-                        "blueprint_id": compose.get("blueprint_id", "N/A"),
-                        "image_name": compose.get("image_name","")}
+            ret: list[dict] = []
+            self.composes[client_id] = []
 
-                if compose.get("blueprint_id"):
-                    data["blueprint_url"] = f"https://{client.domain}/insights/image-builder/imagewizard/{compose['blueprint_id']}"
-                else:
-                    data["blueprint_url"] = "N/A"
-                self.composes[client.client_id].append(data)
+            for i, compose in enumerate(sorted_data, 1):
+                data = self._create_compose_data(compose, i, client)
+                self.composes[client_id].append(data)
 
-                if len(ret) < response_size:
-                    if search_string:
-                        if search_string.lower() in data["image_name"].lower():
-                            ret.append(data)
-                    else:
-                        ret.append(data)
+                # Add to return list if we haven't reached the limit and it matches search criteria
+                if len(ret) < response_size and self._should_include_compose(data, search_string):
+                    ret.append(data)
 
-                i += 1
-            self.compose_current_index[client.client_id] = min(i, response_size + 1)
-            intro = "[INSTRUCTION] Present a bulleted list and use the blueprint_url to link to the blueprint which created this compose\n"
-            if len(self.composes[client.client_id]) > len(ret):
-                intro += f"Only {len(ret)} out of {len(self.composes[client.client_id])} returned. Ask for more if needed:"
+            self.compose_current_index[client_id] = min(len(sorted_data), response_size) + 1
+
+            intro = ("[INSTRUCTION] Present a bulleted list and use the blueprint_url to link to the "
+                     "blueprint which created this compose\n")
+            if len(self.composes[client_id]) > len(ret):
+                intro += (f"Only {len(ret)} out of {len(self.composes[client_id])} "
+                          f"returned. Ask for more if needed:")
             else:
                 intro += f"All {len(ret)} entries. There are no more."
             return f"{intro}\n{json.dumps(ret)}"
-        except Exception as e:
+
+        except ValueError as e:
+            return self.no_auth_error(e)
+        # avoid crashing the server so we'll stick to the broad exception catch
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error: {str(e)}"
 
-    def get_more_composes(self, response_size: int, search_string: str|None = None) -> str:
+    def get_more_composes(self, response_size: int, search_string: str | None = None) -> str:
         """Get more composes without details.
 
         Args:
@@ -620,7 +693,14 @@ class ImageBuilderMCP(FastMCP):
         if response_size <= 0:
             response_size = self.default_response_size
         try:
-            client_id, _ = self.get_client_id_and_secret(get_http_headers())
+            try:
+                client_id, _ = self.get_client_id_and_secret(
+                    get_http_headers())
+            except ValueError as e:
+                return self.no_auth_error(e)
+
+            # At this point, client_id is guaranteed to be a string
+            client_id = str(client_id)  # Explicit type annotation for mypy
             if not self.composes[client_id]:
                 self.get_composes(response_size, search_string)
 
@@ -632,13 +712,16 @@ class ImageBuilderMCP(FastMCP):
             if search_string:
                 search_lower = search_string.lower()
                 filtered_composes = list(filter(
-                    lambda c: search_lower in c.get("image_name","").lower(),
+                    lambda c: search_lower in c.get("image_name", "").lower(),
                     self.composes[client_id]
                 ))
 
             # Get the next batch of items
-            ret = filtered_composes[self.compose_current_index[client_id]:self.compose_current_index[client_id] + response_size]
-            self.compose_current_index[client_id] = min(self.compose_current_index[client_id] + len(ret), len(self.composes[client_id]))
+            start_index = self.compose_current_index[client_id]
+            end_index = start_index + response_size
+            ret = filtered_composes[start_index:end_index]
+            self.compose_current_index[client_id] = min(
+                self.compose_current_index[client_id] + len(ret), len(self.composes[client_id]))
 
             # Prepare response message
             intro = ""
@@ -648,7 +731,8 @@ class ImageBuilderMCP(FastMCP):
                 intro = f"All {len(ret)} entries. There are no more."
 
             return f"{intro}\n{json.dumps(ret)}"
-        except Exception as e:
+        # avoid crashing the server so we'll stick to the broad exception catch
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error: {str(e)}"
 
     def get_compose_details(self, compose_identifier: str) -> str:
@@ -671,7 +755,14 @@ class ImageBuilderMCP(FastMCP):
             except ValueError as e:
                 return self.no_auth_error(e)
 
-            client_id, _ = self.get_client_id_and_secret(get_http_headers())
+            try:
+                client_id, _ = self.get_client_id_and_secret(
+                    get_http_headers())
+            except ValueError as e:
+                return self.no_auth_error(e)
+
+            # At this point, client_id is guaranteed to be a string
+            client_id = str(client_id)  # Explicit type annotation for mypy
             if not self.composes.get(client_id):
                 # get one compose as this just updates the index
                 self.get_composes(self.default_response_size)
@@ -679,18 +770,21 @@ class ImageBuilderMCP(FastMCP):
             # Find matching composes using filter
             matching_composes = list(filter(
                 lambda c: (c["image_name"] == compose_identifier or
-                          c["compose_uuid"] == compose_identifier or
-                          str(c["reply_id"]) == compose_identifier),
+                           c["compose_uuid"] == compose_identifier or
+                           str(c["reply_id"]) == compose_identifier),
                 self.composes[client_id]
             ))
 
             # Get details for each matching compose
-            ret = []
+            ret: list[dict] = []
             for compose in matching_composes:
-                response = client.make_request(f"composes/{compose['compose_uuid']}")
+                response = client.make_request(
+                    f"composes/{compose['compose_uuid']}")
                 if isinstance(response, list):
-                    self.logger.error(f"Error: the response of get_compose_details is a list. " \
-                                      f"This is not expected. Response for {compose['compose_uuid']}: {json.dumps(response)}")
+                    self.logger.error(
+                        "Error: the response of get_compose_details is a list. "
+                        "This is not expected. Response for %s: %s",
+                        compose['compose_uuid'], json.dumps(response))
                     continue
                 response["compose_uuid"] = compose["compose_uuid"]
                 # TBD filter irrelevant attributes
@@ -703,8 +797,10 @@ class ImageBuilderMCP(FastMCP):
             elif len(matching_composes) > 1:
                 intro = f"Found {len(ret)} composes for '{compose_identifier}'.\n"
             for compose in ret:
-                download_url = compose.get("image_status",{}).get("upload_status",{}).get("options",{}).get("url")
-                upload_target = compose.get("image_status",{}).get("upload_status",{}).get("type")
+                download_url = compose.get("image_status", {}).get(
+                    "upload_status", {}).get("options", {}).get("url")
+                upload_target = compose.get("image_status", {}).get(
+                    "upload_status", {}).get("type")
 
                 if download_url and upload_target == "oci.objectstorage":
                     intro += """
@@ -726,12 +822,15 @@ To run the image copy the link below and follow the steps below:
                 # else depends on the status and the target if it can be downloaded
 
             return f"{intro}{json.dumps(ret)}"
-        except Exception as e:
+        # avoid crashing the server so we'll stick to the broad exception catch
+        except Exception as e:  # pylint: disable=broad-exception-caught
             return f"Error: {e}"
+
 
 def main():
     """Main entry point for the Image Builder MCP server."""
-    parser = argparse.ArgumentParser(description="Run Image Builder MCP server.")
+    parser = argparse.ArgumentParser(
+        description="Run Image Builder MCP server.")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument("--stage", action="store_true", help="Use stage API instead of production API")
 
@@ -739,7 +838,7 @@ def main():
     subparsers = parser.add_subparsers(dest="transport", help="Transport mode")
 
     # stdio subcommand (default)
-    stdio_parser = subparsers.add_parser("stdio", help="Use stdio transport (default)")
+    subparsers.add_parser("stdio", help="Use stdio transport (default)")
 
     # sse subcommand
     sse_parser = subparsers.add_parser("sse", help="Use SSE transport")
@@ -747,7 +846,8 @@ def main():
     sse_parser.add_argument("--port", type=int, default=9000, help="Port for SSE transport (default: 9000)")
 
     # http subcommand
-    http_parser = subparsers.add_parser("http", help="Use HTTP streaming transport")
+    http_parser = subparsers.add_parser(
+        "http", help="Use HTTP streaming transport")
     http_parser.add_argument("--host", default="127.0.0.1", help="Host for HTTP transport (default: 127.0.0.1)")
     http_parser.add_argument("--port", type=int, default=8000, help="Port for HTTP transport (default: 8000)")
 
@@ -775,7 +875,8 @@ def main():
         logging.info("Debug mode enabled")
 
     # Create and run the MCP server
-    mcp_server = ImageBuilderMCP(client_id, client_secret, stage=args.stage, proxy_url=proxy_url, transport=args.transport)
+    mcp_server = ImageBuilderMCP(
+        client_id, client_secret, stage=args.stage, proxy_url=proxy_url, transport=args.transport)
 
     if args.transport == "sse":
         mcp_server.run(transport="sse", host=args.host, port=args.port)
@@ -786,4 +887,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    main()

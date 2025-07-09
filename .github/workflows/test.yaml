@@ -1,6 +1,6 @@
 name: Test
 
-on:
+on:  # yamllint disable-line rule:truthy
   pull_request:
     branches:
       - "*"
@@ -11,11 +11,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,4 +34,4 @@ jobs:
         run: make install-test-deps
 
       - name: Run tests
-        run: make test 
+        run: make test

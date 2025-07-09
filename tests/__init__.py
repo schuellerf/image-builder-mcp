@@ -1,1 +1,1 @@
-# Tests package for image-builder-mcp 
+# Tests package for image-builder-mcp
