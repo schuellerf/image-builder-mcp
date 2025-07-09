@@ -30,6 +30,10 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-cov",
+    "mypy",
+    "types-requests",
+    "pylint",
+    "autopep8",
 ]
 
 [project.scripts]
@@ -44,4 +48,10 @@ Issues = "https://github.com/osbuild/image-builder-mcp/issues"
 where = ["src"]
 
 [tool.setuptools.package-dir]
-"" = "src" 
+"" = "src"
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.autopep8]
+max_line_length = 120
