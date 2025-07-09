@@ -18,13 +18,7 @@ Install the package in development mode:
 pip install -e .
 ```
 
-Then run using either:
-
-```
-python -m image_builder_mcp sse
-```
-
-or using the CLI entry point:
+Then run using the CLI entry point:
 
 ```
 image-builder-mcp sse
@@ -33,12 +27,6 @@ image-builder-mcp sse
 This will start `image-builder-mcp` server at http://localhost:9000/sse
 
 For HTTP streaming transport:
-
-```
-python -m image_builder_mcp http
-```
-
-or using the CLI entry point:
 
 ```
 `image-builder-mcp` http
@@ -140,6 +128,14 @@ To start the integration create a file `~/.cursor/mcp.json` with
 ```
 
 or use it via "Streamable HTTP"
+
+start the server:
+
+```
+podman run --net host --rm ghcr.io/osbuild/image-builder-mcp:latest
+```
+
+then integrate:
 
 ```
 {
