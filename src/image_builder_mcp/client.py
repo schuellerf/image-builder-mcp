@@ -5,6 +5,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union
 
+from fastmcp.server.dependencies import get_http_headers
+
 import requests
 
 
@@ -21,7 +23,8 @@ class ImageBuilderClient:  # pylint: disable=too-many-instance-attributes
             client_secret: Optional[str],
             stage: Optional[bool] = False,
             proxy_url: Optional[str] = None,
-            image_builder_mcp_client_id: str = "mcp"
+            image_builder_mcp_client_id: str = "mcp",
+            oauth_enabled: bool = False
     ):
         self.client_id = client_id
         self.client_secret = client_secret
@@ -30,6 +33,7 @@ class ImageBuilderClient:  # pylint: disable=too-many-instance-attributes
         self.stage = stage
         self.proxy_url = proxy_url
         self.image_builder_mcp_client_id = image_builder_mcp_client_id
+        self.oauth_enabled = oauth_enabled
         self.logger = logging.getLogger("ImageBuilderClient")
 
         if self.stage:
@@ -42,6 +46,9 @@ class ImageBuilderClient:  # pylint: disable=too-many-instance-attributes
 
     def get_token(self) -> str:
         """Get or refresh the authentication token."""
+        if self.oauth_enabled:
+            self.logger.debug("OAuth is enabled, skipping token management")
+            return ""
         if self.token and self.token_expiry and datetime.now() < self.token_expiry:
             self.logger.debug(
                 "Using cached token valid until %s", self.token_expiry)
@@ -80,8 +87,16 @@ class ImageBuilderClient:  # pylint: disable=too-many-instance-attributes
             "Content-Type": "application/json",
             "X-ImageBuilder-ui": self.image_builder_mcp_client_id
         }
-        if self.client_id and self.client_secret:
-            headers["Authorization"] = f"Bearer {self.get_token()}"
+
+        if self.oauth_enabled:
+            caller_headers_auth = get_http_headers().get("authorization")
+            if caller_headers_auth:
+                # If the request is authenticated, use the caller's authorization header
+                # This is useful for OAuth flows where the client is already authenticated
+                headers["authorization"] = caller_headers_auth
+        elif self.client_id and self.client_secret:
+            headers["authorization"] = f"Bearer {self.get_token()}"
+
         # else no authentication, use public API
 
         url = f"{self.base_url}/{endpoint}"

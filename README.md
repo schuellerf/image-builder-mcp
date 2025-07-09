@@ -142,7 +142,7 @@ then integrate:
     "mcpServers": {
         "image-builder-mcp-http": {
             "type": "Streamable HTTP",
-            "url": "http://localhost:8000/mcp",
+            "url": "http://localhost:8000/mcp/",
             "headers": {
                 "removeprefix_image-builder-client-id": "YOUR_ID here, then remove 'removeprefix_'",
                 "removeprefix_image-builder-client-secret": "YOUR_SECRET here, then remove 'removeprefix_'"
