@@ -29,13 +29,17 @@ help: ## Show this help message
 	@echo 'Targets:'
 	@awk 'match($$0, /^([a-zA-Z_\/-]+):.*? ## (.*)$$/, m) {printf "  \033[36m%-30s\033[0m %s\n", m[1], m[2]}' $(MAKEFILE_LIST) | sort
 
-.PHONY: build test test-coverage install-test-deps clean-test help run-sse run-stdio
+.PHONY: build test test-coverage install-test-deps clean-test help run-sse run-http run-stdio
 
 # `IMAGE_BUILDER_CLIENT_ID` and `IMAGE_BUILDER_CLIENT_SECRET` are optional
 # if you hand those over via http headers from the client.
 run-sse: build ## Run the MCP server with SSE transport
 	# add firewall rules for fedora
 	podman run --rm --network=host --env IMAGE_BUILDER_CLIENT_ID --env IMAGE_BUILDER_CLIENT_SECRET --name image-builder-mcp-sse localhost/image-builder-mcp:latest sse
+
+run-http: build ## Run the MCP server with HTTP streaming transport
+	# add firewall rules for fedora
+	podman run --rm --network=host --env IMAGE_BUILDER_CLIENT_ID --env IMAGE_BUILDER_CLIENT_SECRET --name image-builder-mcp-http localhost/image-builder-mcp:latest http
 
 # just an example command
 # doesn't really make sense

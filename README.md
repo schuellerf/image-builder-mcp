@@ -32,12 +32,31 @@ image-builder-mcp sse
 
 This will start image-builder-mcp server at http://localhost:9000/sse
 
+For HTTP streaming transport:
+
+```
+python -m image_builder_mcp http
+```
+
+or using the CLI entry point:
+
+```
+image-builder-mcp http
+```
+
+This will start image-builder-mcp server with HTTP streaming transport at http://localhost:8000
+
 ### Using Podman/Docker
 
 You can also copy the command from the [Makefile]
 For SSE mode:
 ```
 make run-sse
+```
+
+For HTTP streaming mode:
+```
+make run-http
 ```
 
 You can also copy the command from the [Makefile]
@@ -117,5 +136,22 @@ To start the integration create a file `~/.cursor/mcp.json` with
         }
     }
   }
+}
+```
+
+or use it via "Streamable HTTP"
+
+```
+{
+    "mcpServers": {
+        "image-builder-mcp-http": {
+            "type": "Streamable HTTP",
+            "url": "http://localhost:8000/mcp",
+            "headers": {
+                "removeprefix_image-builder-client-id": "YOUR_ID here, then remove 'removeprefix_'",
+                "removeprefix_image-builder-client-secret": "YOUR_SECRET here, then remove 'removeprefix_'"
+            }
+        }
+    }
 }
 ```

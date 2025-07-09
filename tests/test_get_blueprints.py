@@ -335,4 +335,26 @@ class TestGetBlueprints:
             assert "header variables" in result
             assert "image-builder-client-id" in result
             assert "image-builder-client-secret" in result
+            assert "Error: Client ID and secret are required to access the Image Builder API" in result
+
+    def test_get_blueprints_no_auth_error_message_http_transport(self):
+        """Test that get_blueprints returns the no_auth_error() message for HTTP transport when authentication is missing."""
+        # Create MCP server with HTTP transport
+        mcp_server = ImageBuilderMCP(
+            client_id=None,
+            client_secret=None,
+            stage=False,
+            transport="http"
+        )
+        
+        with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
+            mock_headers.return_value = {}  # No auth headers
+            
+            result = mcp_server.get_blueprints(response_size=7)
+            
+            # Check for relevant parts of the no_auth_error message for HTTP transport
+            assert "Tell the user" in result
+            assert "header variables" in result
+            assert "image-builder-client-id" in result
+            assert "image-builder-client-secret" in result
             assert "Error: Client ID and secret are required to access the Image Builder API" in result 
