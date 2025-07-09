@@ -4,6 +4,9 @@ build-prod: ## Build the container image but with the upstream tag
 build: ## Build the container image
 	podman build --tag image-builder-mcp .
 
+lint: ## Run linting with pre-commit
+	pre-commit run --all-files
+
 test: ## Run tests with pytest
 	@echo "Running pytest tests..."
 	pytest tests/ -v
