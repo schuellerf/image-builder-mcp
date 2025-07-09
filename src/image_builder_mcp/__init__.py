@@ -3,5 +3,4 @@
 from .client import ImageBuilderClient
 from .server import ImageBuilderMCP
 
-__all__ = ["ImageBuilderMCP", "ImageBuilderClient"] 
-
+__all__ = ["ImageBuilderMCP", "ImageBuilderClient"]

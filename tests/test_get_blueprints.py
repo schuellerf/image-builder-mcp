@@ -1,7 +1,9 @@
-import pytest
+"""Test suite for the get_blueprints() method."""
+
 import json
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime
+from unittest.mock import Mock, patch
+
+import pytest
 
 # Clean import - no sys.path.insert needed with proper package structure!
 from image_builder_mcp import ImageBuilderMCP, ImageBuilderClient
@@ -65,7 +67,7 @@ class TestGetBlueprints:
         client.domain = 'console.redhat.com'
         return client
 
-    def test_get_blueprints_basic_functionality(self, mcp_server, mock_client, mock_api_response):
+    def test_get_blueprints_basic_functionality(self, mcp_server, mock_client, mock_api_response):  # pylint: disable=too-many-locals
         """Test basic functionality of get_blueprints method."""
         # Setup mocks
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
@@ -86,7 +88,7 @@ class TestGetBlueprints:
             assert result.startswith("[INSTRUCTION]")
             assert "Use the UI_URL to link to the blueprint" in result
             assert "[ANSWER]" in result
-            
+
             # Extract JSON data from result
             json_start = result.find('[{"reply_id"')
             json_end = result.rfind('}]') + 2
@@ -96,7 +98,7 @@ class TestGetBlueprints:
             # Verify structure and content
             assert len(blueprints) == 4
             assert all(isinstance(bp, dict) for bp in blueprints)
-            
+
             # Check required fields exist
             required_fields = ['reply_id', 'blueprint_uuid', 'UI_URL', 'name']
             for blueprint in blueprints:
@@ -119,7 +121,8 @@ class TestGetBlueprints:
 
             # Verify UI_URL format
             for blueprint in blueprints:
-                expected_url = f"https://console.redhat.com/insights/image-builder/imagewizard/{blueprint['blueprint_uuid']}"
+                expected_url = ("https://console.redhat.com/insights/image-builder/imagewizard/"
+                                f"{blueprint['blueprint_uuid']}")
                 assert blueprint['UI_URL'] == expected_url
 
     def test_get_blueprints_with_response_size_limit(self, mcp_server, mock_client, mock_api_response):
@@ -263,7 +266,8 @@ class TestGetBlueprints:
             assert 'test-client-id' in mcp_server.blueprints
             assert len(mcp_server.blueprints['test-client-id']) == 4
             assert 'test-client-id' in mcp_server.blueprint_current_index
-            assert mcp_server.blueprint_current_index['test-client-id'] == 3  # min(4, 2+1)
+            # min(4, 2+1)
+            assert mcp_server.blueprint_current_index['test-client-id'] == 3
 
             # Verify blueprint data structure
             for i, blueprint in enumerate(mcp_server.blueprints['test-client-id']):
@@ -290,7 +294,7 @@ class TestGetBlueprints:
             json_end = result.rfind('}]') + 2
             json_data = result[json_start:json_end]
             blueprints = json.loads(json_data)
-            
+
             assert len(blueprints) == 4  # All blueprints should be returned
 
     def test_get_blueprints_no_auth_error_message(self):
@@ -301,13 +305,13 @@ class TestGetBlueprints:
             client_secret=None,
             stage=False
         )
-        
+
         # Test default transport mode
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
             mock_headers.return_value = {}  # No auth headers
-            
+
             result = mcp_server.get_blueprints(response_size=7)
-            
+
             # Check for relevant parts of the no_auth_error message for default transport
             assert "Tell the user" in result
             assert "IMAGE_BUILDER_CLIENT_ID" in result
@@ -316,7 +320,10 @@ class TestGetBlueprints:
             assert "Error: Client ID and secret are required to access the Image Builder API" in result
 
     def test_get_blueprints_no_auth_error_message_sse_transport(self):
-        """Test that get_blueprints returns the no_auth_error() message for SSE transport when authentication is missing."""
+        """Test that get_blueprints returns the no_auth_error() message for SSE transport.
+
+        Tests the case when authentication is missing.
+        """
         # Create MCP server with SSE transport
         mcp_server = ImageBuilderMCP(
             client_id=None,
@@ -324,12 +331,12 @@ class TestGetBlueprints:
             stage=False,
             transport="sse"
         )
-        
+
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
             mock_headers.return_value = {}  # No auth headers
-            
+
             result = mcp_server.get_blueprints(response_size=7)
-            
+
             # Check for relevant parts of the no_auth_error message for SSE transport
             assert "Tell the user" in result
             assert "header variables" in result
@@ -338,7 +345,10 @@ class TestGetBlueprints:
             assert "Error: Client ID and secret are required to access the Image Builder API" in result
 
     def test_get_blueprints_no_auth_error_message_http_transport(self):
-        """Test that get_blueprints returns the no_auth_error() message for HTTP transport when authentication is missing."""
+        """Test that get_blueprints returns the no_auth_error() message for HTTP transport.
+
+        Tests the case when authentication is missing.
+        """
         # Create MCP server with HTTP transport
         mcp_server = ImageBuilderMCP(
             client_id=None,
@@ -346,15 +356,15 @@ class TestGetBlueprints:
             stage=False,
             transport="http"
         )
-        
+
         with patch.object(image_builder_mcp, 'get_http_headers') as mock_headers:
             mock_headers.return_value = {}  # No auth headers
-            
+
             result = mcp_server.get_blueprints(response_size=7)
-            
+
             # Check for relevant parts of the no_auth_error message for HTTP transport
             assert "Tell the user" in result
             assert "header variables" in result
             assert "image-builder-client-id" in result
             assert "image-builder-client-secret" in result
-            assert "Error: Client ID and secret are required to access the Image Builder API" in result 
+            assert "Error: Client ID and secret are required to access the Image Builder API" in result
