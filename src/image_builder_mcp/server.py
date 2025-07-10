@@ -901,7 +901,7 @@ def main():
         logging.getLogger("ImageBuilderOAuthMiddleware").setLevel(logging.DEBUG)
         logging.info("Debug mode enabled")
 
-    oauth_enabled = bool(os.getenv("OAUTH_ENABLED", "false"))
+    oauth_enabled = os.getenv("OAUTH_ENABLED", "false").lower() == "true"
 
     # Create and run the MCP server
     mcp_server = ImageBuilderMCP(
